@@ -25,3 +25,9 @@ class CategoriasManager:
         supabase = get_supabase()
         supabase.table('categorias').delete().eq('id', cat_id).execute()
         return True
+
+    # Aliases de compatibilidad con UI
+    crear_categoria = crear
+    actualizar_categoria = actualizar
+    eliminar_categoria = eliminar
+

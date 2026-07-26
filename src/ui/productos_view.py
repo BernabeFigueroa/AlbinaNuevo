@@ -110,36 +110,27 @@ class ProductosView(QWidget):
         g_frame = self.crear_seccion_frame()
         g_layout = QGridLayout(g_frame)
         
-        g_layout.addWidget(QLabel("Cód. Interno:"), 0, 0)
-        self.txt_codigo_interno = QLineEdit("[ Automático ]")
-        self.txt_codigo_interno.setReadOnly(True)
-        self.txt_codigo_interno.setStyleSheet("color: #555555; background-color: transparent; border: none;")
-        g_layout.addWidget(self.txt_codigo_interno, 0, 1)
-
-        g_layout.addWidget(QLabel("Cód. Barras (Opcional):"), 0, 2)
-        self.txt_codigo_barras = QLineEdit()
-        self.txt_codigo_barras
-        g_layout.addWidget(self.txt_codigo_barras, 0, 3)
-
-        g_layout.addWidget(QLabel("Descripción:"), 0, 4)
+        g_layout.addWidget(QLabel("Nombre del Producto:"), 0, 0)
         self.txt_descripcion = QLineEdit()
-        self.txt_descripcion
-        g_layout.addWidget(self.txt_descripcion, 0, 5, 1, 2)
+        g_layout.addWidget(self.txt_descripcion, 0, 1, 1, 3)
 
-        g_layout.addWidget(QLabel("Cód. Fábrica:"), 1, 0)
+        g_layout.addWidget(QLabel("Cód. Barras (Opcional):"), 0, 4)
+        self.txt_codigo_barras = QLineEdit()
+        g_layout.addWidget(self.txt_codigo_barras, 0, 5)
+
+        # Referencias ocultas para compatibilidad
+        self.txt_codigo_interno = QLineEdit("[ Automático ]")
+        self.txt_codigo_interno.setVisible(False)
         self.txt_codigo_fabrica = QLineEdit()
-        self.txt_codigo_fabrica
-        g_layout.addWidget(self.txt_codigo_fabrica, 1, 1)
+        self.txt_codigo_fabrica.setVisible(False)
 
-        g_layout.addWidget(QLabel("Rubro/Categoría:"), 1, 2)
+        g_layout.addWidget(QLabel("Rubro/Categoría:"), 1, 0)
         self.cb_categoria = QComboBox()
+        g_layout.addWidget(self.cb_categoria, 1, 1)
 
-        g_layout.addWidget(self.cb_categoria, 1, 3)
-
-        g_layout.addWidget(QLabel("Proveedor:"), 1, 4)
+        g_layout.addWidget(QLabel("Proveedor:"), 1, 2)
         self.cb_proveedor = QComboBox()
-
-        g_layout.addWidget(self.cb_proveedor, 1, 5, 1, 2)
+        g_layout.addWidget(self.cb_proveedor, 1, 3, 1, 3)
 
         form_layout.addWidget(g_frame)
 

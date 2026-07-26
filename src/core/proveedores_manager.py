@@ -41,3 +41,9 @@ class ProveedoresManager:
         supabase = get_supabase()
         supabase.table('proveedores').update({'activo': True}).eq('id', prov_id).execute()
         return True
+
+    # Aliases de compatibilidad con UI
+    crear_proveedor = crear
+    actualizar_proveedor = actualizar
+    eliminar_proveedor = eliminar
+

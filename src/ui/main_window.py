@@ -20,7 +20,10 @@ class MainWindow(QMainWindow):
         # Set Window Icon
         import os, sys
         from PyQt6.QtGui import QIcon
-        base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         self.setWindowIcon(QIcon(os.path.join(base_path, "logo-albina.png")))
         
         self.init_ui()
@@ -41,13 +44,17 @@ class MainWindow(QMainWindow):
         # Título del menú (Logo)
         lbl_brand = QLabel()
         from PyQt6.QtGui import QPixmap
-        import os
-        base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        import os, sys
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         logo_path = os.path.join(base_path, "logo-albina.png")
         pixmap = QPixmap(logo_path)
         if not pixmap.isNull():
             lbl_brand.setPixmap(pixmap.scaled(200, 100, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
             lbl_brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
             lbl_brand.setStyleSheet("margin-bottom: 20px; border: none; background-color: transparent;")
         else:
             lbl_brand.setText("ALBINA ACCESORIOS")

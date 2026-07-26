@@ -44,7 +44,7 @@ class ReportesManager:
             
             if mp == 'EFECTIVO':
                 efectivo += total
-            elif mp in ('TRANSFERENCIA', 'TARJETA/TRANSFERENCIA'):
+            elif mp in ('TRANSFERENCIA', 'TARJETA', 'TARJETA/TRANSFERENCIA'):
                 transferencia += total
             elif mp == 'MIXTO':
                 # En Supabase Python habría que traer los movimientos asociados para precisión,
@@ -231,3 +231,194 @@ class ReportesManager:
             
         resultado.sort(key=lambda x: x['total_vendido'], reverse=True)
         return resultado
+
+    @staticmethod
+    def generar_excel_declaracion_ventas(fecha_desde: str, fecha_hasta: str, filepath: str):
+        ReportesManager._check_permission()
+        desde = f"{fecha_desde}T00:00:00"
+        hasta = f"{fecha_hasta}T23:59:59"
+        
+        supabase = get_supabase()
+        res = supabase.table('ventas').select(
+            'id, fecha, total, metodo_pago, clientes(nombre), usuarios(nombre, username)'
+        ).neq('estado', 'CANCELADA').gte('fecha', desde).lte('fecha', hasta).order('fecha', desc=False).execute()
+        
+        ventas = res.data
+        
+        # Agrupar por método de pago
+        grupos = defaultdict(list)
+        totales_grupo = defaultdict(float)
+        
+        for v in ventas:
+            mp = v.get('metodo_pago') or 'OTROS'
+            total = float(v['total'])
+            vendedor = 'Sistema'
+            if v.get('usuarios'):
+                vendedor = v['usuarios'].get('nombre') or v['usuarios'].get('username') or 'Sistema'
+            cliente = v['clientes']['nombre'] if v.get('clientes') else 'Consumidor Final'
+            
+            # Formatear fecha limpia
+            fecha_str = v['fecha']
+            if 'T' in fecha_str:
+                partes = fecha_str.split('T')
+                f_date = partes[0]
+                f_time = partes[1].split('.')[0]
+                fecha_str = f"{f_date} {f_time}"
+
+            item = {
+                'id': f"{v['id']:08d}",
+                'fecha': fecha_str,
+                'cliente': cliente,
+                'vendedor': vendedor,
+                'total': total
+            }
+            grupos[mp].append(item)
+            totales_grupo[mp] += total
+
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            
+            wb = openpyxl.Workbook()
+            # Hoja Resumen
+            ws_resumen = wb.active
+            ws_resumen.title = "Resumen de Declaración"
+            
+            # Estilos
+            font_title = Font(name="Calibri", size=16, bold=True, color="1F4E79")
+            font_subtitle = Font(name="Calibri", size=11, italic=True, color="595959")
+            font_header = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+            font_bold = Font(name="Calibri", size=11, bold=True)
+            
+            fill_header = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+            fill_subtotal = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+            
+            thin_border = Border(
+                left=Side(style='thin', color='D9D9D9'),
+                right=Side(style='thin', color='D9D9D9'),
+                top=Side(style='thin', color='D9D9D9'),
+                bottom=Side(style='thin', color='D9D9D9')
+            )
+
+            # Título Resumen
+            ws_resumen['A1'] = "DECLARACIÓN DE VENTAS POR MEDIO DE PAGO"
+            ws_resumen['A1'].font = font_title
+            ws_resumen['A2'] = f"Período: {fecha_desde} al {fecha_hasta}"
+            ws_resumen['A2'].font = font_subtitle
+            
+            ws_resumen.append([])
+            headers_resumen = ["Medio de Pago", "Cantidad de Ventas", "Total Recaudado ($)"]
+            ws_resumen.append(headers_resumen)
+            
+            for col in range(1, 4):
+                cell = ws_resumen.cell(row=4, column=col)
+                cell.font = font_header
+                cell.fill = fill_header
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+
+            row_idx = 5
+            grand_total = 0.0
+            grand_cant = 0
+            
+            for mp, items in grupos.items():
+                tot = totales_grupo[mp]
+                cant = len(items)
+                grand_total += tot
+                grand_cant += cant
+                
+                c1 = ws_resumen.cell(row=row_idx, column=1, value=mp)
+                c2 = ws_resumen.cell(row=row_idx, column=2, value=cant)
+                c3 = ws_resumen.cell(row=row_idx, column=3, value=tot)
+                
+                c3.number_format = '"$"#,##0.00'
+                for c in (c1, c2, c3):
+                    c.border = thin_border
+                row_idx += 1
+                
+            # Fila Total General
+            c1 = ws_resumen.cell(row=row_idx, column=1, value="TOTAL GENERAL")
+            c2 = ws_resumen.cell(row=row_idx, column=2, value=grand_cant)
+            c3 = ws_resumen.cell(row=row_idx, column=3, value=grand_total)
+            c3.number_format = '"$"#,##0.00'
+            
+            for c in (c1, c2, c3):
+                c.font = font_bold
+                c.fill = fill_subtotal
+                c.border = thin_border
+                
+            ws_resumen.column_dimensions['A'].width = 25
+            ws_resumen.column_dimensions['B'].width = 20
+            ws_resumen.column_dimensions['C'].width = 22
+
+            # Crear una hoja por cada método de pago
+            for mp, items in grupos.items():
+                sheet_name = mp.replace('/', '-').replace('\\', '-')[:30]
+                ws = wb.create_sheet(title=sheet_name)
+                
+                ws['A1'] = f"VENTAS - {mp}"
+                ws['A1'].font = font_title
+                ws['A2'] = f"Período: {fecha_desde} al {fecha_hasta}"
+                ws['A2'].font = font_subtitle
+                ws.append([])
+                
+                headers = ["Factura Nº", "Fecha y Hora", "Cliente", "Vendedor", "Total ($)"]
+                ws.append(headers)
+                
+                for col in range(1, 6):
+                    cell = ws.cell(row=4, column=col)
+                    cell.font = font_header
+                    cell.fill = fill_header
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                    
+                r = 5
+                subtot = 0.0
+                for it in items:
+                    c1 = ws.cell(row=r, column=1, value=it['id'])
+                    c2 = ws.cell(row=r, column=2, value=it['fecha'])
+                    c3 = ws.cell(row=r, column=3, value=it['cliente'])
+                    c4 = ws.cell(row=r, column=4, value=it['vendedor'])
+                    c5 = ws.cell(row=r, column=5, value=it['total'])
+                    c5.number_format = '"$"#,##0.00'
+                    
+                    for c in (c1, c2, c3, c4, c5):
+                        c.border = thin_border
+                    subtot += it['total']
+                    r += 1
+                    
+                # Total por sección
+                ws.cell(row=r, column=1, value="TOTAL").font = font_bold
+                c_sub = ws.cell(row=r, column=5, value=subtot)
+                c_sub.font = font_bold
+                c_sub.number_format = '"$"#,##0.00'
+                ws.cell(row=r, column=1).fill = fill_subtotal
+                c_sub.fill = fill_subtotal
+                
+                ws.column_dimensions['A'].width = 15
+                ws.column_dimensions['B'].width = 22
+                ws.column_dimensions['C'].width = 30
+                ws.column_dimensions['D'].width = 20
+                ws.column_dimensions['E'].width = 18
+
+            wb.save(filepath)
+            return True
+            
+        except ImportError:
+            # Fallback a CSV tabulado con UTF-8 BOM para Excel si openpyxl no estuviera instalado
+            import csv
+            with open(filepath, 'w', newline='', encoding='utf-8-sig') as f:
+                writer = csv.writer(f, delimiter=';')
+                writer.writerow(["DECLARACIÓN DE VENTAS POR MEDIO DE PAGO"])
+                writer.writerow([f"Período: {fecha_desde} al {fecha_hasta}"])
+                writer.writerow([])
+                
+                for mp, items in grupos.items():
+                    writer.writerow([f"=== SECCIÓN: {mp} ==="])
+                    writer.writerow(["Factura Nro", "Fecha y Hora", "Cliente", "Vendedor", "Total"])
+                    subtot = 0.0
+                    for it in items:
+                        writer.writerow([it['id'], it['fecha'], it['cliente'], it['vendedor'], f"{it['total']:.2f}"])
+                        subtot += it['total']
+                    writer.writerow(["TOTAL SECCIÓN", "", "", "", f"{subtot:.2f}"])
+                    writer.writerow([])
+            return True
+

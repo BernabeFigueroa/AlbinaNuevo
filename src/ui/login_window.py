@@ -16,15 +16,30 @@ class LoginWindow(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setSpacing(20)
         
+        # Resolver ruta compatible con PyInstaller (_MEIPASS) o desarrollo local
+        import os, sys
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            
+        logo_path = os.path.join(base_path, "logo-albina.png")
+        icon_path = os.path.join(base_path, "app_icon.ico")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        elif os.path.exists(logo_path):
+            self.setWindowIcon(QIcon(logo_path))
+
         # Logo
         logo = QLabel()
-        pixmap = QPixmap("logo-albina.png")
+        pixmap = QPixmap(logo_path)
         if not pixmap.isNull():
-            logo.setPixmap(pixmap.scaledToWidth(250, Qt.TransformationMode.SmoothTransformation))
+            logo.setPixmap(pixmap.scaledToWidth(280, Qt.TransformationMode.SmoothTransformation))
         else:
             logo.setText("albina accesorios")
             logo.setStyleSheet("font-size: 28px; font-weight: bold; color: #000000;")
         logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         
         subtitle = QLabel("")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -95,12 +110,21 @@ class LoginWindow(QWidget):
             self.login_btn.setEnabled(True)
             
     def toggle_password(self):
+        import os, sys
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+
         if self.password_input.echoMode() == QLineEdit.EchoMode.Password:
             self.password_input.setEchoMode(QLineEdit.EchoMode.Normal)
-            self.toggle_pwd_btn.setIcon(QIcon("assets/icons/visibility_off.svg"))
+            icon_p = os.path.join(base_path, "assets", "icons", "visibility_off.svg")
+            self.toggle_pwd_btn.setIcon(QIcon(icon_p))
         else:
             self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-            self.toggle_pwd_btn.setIcon(QIcon("assets/icons/visibility.svg"))
+            icon_p = os.path.join(base_path, "assets", "icons", "visibility.svg")
+            self.toggle_pwd_btn.setIcon(QIcon(icon_p))
+
             
     def open_main_window(self):
         self.main_window = MainWindow()

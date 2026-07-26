@@ -11,12 +11,52 @@ class BuscadorClientesDialog(QDialog):
         self.setWindowTitle("Buscador de Clientes (F3)")
         self.resize(800, 600)
         self.setStyleSheet("""
-            QDialog { background-color: #FFFFFF; border: 1px solid #E5DFD5; border-radius: 8px; color: #000000; }
-            
-            
-            QTableWidget::item { border-bottom: 1px solid #B09886; padding: 4px; }
-            QHeaderView::section { background-color: #B09886; color: #555555; padding: 10px; font-weight: bold; border: none; border-bottom: 2px solid #E5DFD5; }
+            QDialog {
+                background-color: #FAF8F5;
+                color: #2C2520;
+            }
+            QLabel {
+                color: #2C2520;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QLineEdit {
+                background-color: #FFFFFF;
+                color: #2C2520;
+                border: 1px solid #ACA096;
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #B09886;
+            }
+            QTableWidget {
+                background-color: #FFFFFF;
+                alternate-background-color: #FDFBF7;
+                gridline-color: #E5DFD5;
+                border: 1px solid #E5DFD5;
+                border-radius: 8px;
+                color: #2C2520;
+            }
+            QTableWidget::item {
+                padding: 6px;
+                color: #2C2520;
+            }
+            QTableWidget::item:selected {
+                background-color: #B09886;
+                color: #FFFFFF;
+            }
+            QHeaderView::section {
+                background-color: #F4EFE6;
+                color: #2C2520;
+                padding: 8px;
+                font-weight: bold;
+                border: none;
+                border-bottom: 2px solid #E5DFD5;
+            }
         """)
+
         
         self.cliente_id_seleccionado = None
         self.init_ui()

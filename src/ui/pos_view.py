@@ -62,23 +62,32 @@ class POSView(QWidget):
         
         # Botón de engranaje para alternar menú
         from PyQt6.QtGui import QIcon
+        from PyQt6.QtCore import QSize
+        import os, sys
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        
+        icon_path = os.path.join(base_path, "assets", "icons", "settings.svg")
         self.btn_toggle_menu = QPushButton()
-        self.btn_toggle_menu.setIcon(QIcon("assets/icons/settings.svg"))
-        self.btn_toggle_menu.setFixedWidth(40)
+        self.btn_toggle_menu.setIcon(QIcon(icon_path))
+        self.btn_toggle_menu.setIconSize(QSize(24, 24))
+        self.btn_toggle_menu.setFixedSize(40, 40)
         self.btn_toggle_menu.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_toggle_menu.setStyleSheet("""
             QPushButton {
-                background-color: transparent;
-                border: none;
-                padding: 5px;
+                background-color: #F4EFE6;
+                border: 1px solid #E5DFD5;
+                border-radius: 8px;
             }
             QPushButton:hover {
                 background-color: #E5DFD5;
-                border-radius: 4px;
             }
         """)
         self.btn_toggle_menu.clicked.connect(lambda: self.toggle_sidebar.emit())
         header_layout.addWidget(self.btn_toggle_menu, 0, 6, Qt.AlignmentFlag.AlignRight)
+
         
         # Panel derecho del comprobante (Factura B, etc)
         comprobante_frame = QFrame()
@@ -216,9 +225,10 @@ class POSView(QWidget):
         pago_layout.addWidget(QLabel("Medio de Pago:"))
         self.cb_medio_pago = QComboBox()
 
-        self.cb_medio_pago.addItems(["EFECTIVO", "TRANSFERENCIA", "MIXTO", "FIADO / CTA. CTE."])
+        self.cb_medio_pago.addItems(["EFECTIVO", "TRANSFERENCIA", "TARJETA", "MIXTO", "FIADO / CTA. CTE."])
         self.cb_medio_pago.setStyleSheet("font-size: 16px; font-weight: bold; padding: 5px;")
         self.cb_medio_pago.setFixedHeight(40)
+        self.cb_medio_pago.currentIndexChanged.connect(self.actualizar_tabla)
         pago_layout.addWidget(self.cb_medio_pago)
         pago_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         bottom_layout.addLayout(pago_layout)
@@ -511,13 +521,25 @@ class POSView(QWidget):
             self.tabla_carrito.setItem(row_idx, 4, item_pu)
             self.tabla_carrito.setItem(row_idx, 5, item_imp)
 
-        if self.descuento_actual > 0:
-            descuento_monto = total * (self.descuento_actual / 100.0)
+        medio_pago = self.cb_medio_pago.currentText()
+        descuento_medio_pago = 30.0 if medio_pago in ["EFECTIVO", "TRANSFERENCIA"] else 0.0
+        pct_descuento_total = self.descuento_actual + descuento_medio_pago
+
+        if pct_descuento_total > 0:
+            descuento_monto = total * (pct_descuento_total / 100.0)
             total_final = total - descuento_monto
-            self.lbl_descuento.setText(f"Subtotal: ${total:.2f} | Descuento {self.descuento_actual:.0f}%: -${descuento_monto:.2f}")
+            
+            detalles_desc = []
+            if descuento_medio_pago > 0:
+                detalles_desc.append(f"Desc. {medio_pago} (30%)")
+            if self.descuento_actual > 0:
+                detalles_desc.append(f"Desc. Cliente ({self.descuento_actual:.0f}%)")
+            
+            lbl_desc_str = " + ".join(detalles_desc)
+            self.lbl_descuento.setText(f"Precio Lista: ${total:.2f} | {lbl_desc_str}: -${descuento_monto:.2f}")
             self.lbl_total.setText(f"${total_final:.2f}")
         else:
-            self.lbl_descuento.setText("")
+            self.lbl_descuento.setText(f"Precio Lista: ${total:.2f}")
             self.lbl_total.setText(f"${total:.2f}")
         self._actualizando_tabla = False
 
@@ -578,7 +600,11 @@ class POSView(QWidget):
             total_venta = 0.0
             for item in self.carrito:
                 total_venta += item['cantidad'] * item['precio_unitario']
-            descuento_monto = total_venta * (self.descuento_actual / 100.0)
+                
+            descuento_medio_pago = 30.0 if metodo_pago_seleccionado in ["EFECTIVO", "TRANSFERENCIA"] else 0.0
+            pct_descuento_total = self.descuento_actual + descuento_medio_pago
+            
+            descuento_monto = total_venta * (pct_descuento_total / 100.0)
             total_final = total_venta - descuento_monto
             
             if metodo_pago_seleccionado == "EFECTIVO":
@@ -631,7 +657,7 @@ class POSView(QWidget):
                 subtotal=resultado["subtotal"],
                 descuento=resultado["descuento"],
                 total=resultado["total"],
-                empresa_nombre="BEBIDAS FRIAS"
+                empresa_nombre="Albina Accesorios"
             )
             
             if metodo_pago_seleccionado == "EFECTIVO":

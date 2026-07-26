@@ -12,15 +12,56 @@ class BuscadorProductosDialog(QDialog):
         self.setWindowTitle("Buscador de Artículos (F2)")
         self.resize(800, 600)
         self.setStyleSheet("""
-            QDialog { background-color: #11111b; color: #000000; }
-            
-            
-            QHeaderView::section { background-color: #181825; color: #000000; padding: 5px; font-weight: bold; border: none; border-bottom: 1px solid #313244; border-right: 1px solid #313244;}
+            QDialog {
+                background-color: #FAF8F5;
+                color: #2C2520;
+            }
+            QLabel {
+                color: #2C2520;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QLineEdit {
+                background-color: #FFFFFF;
+                color: #2C2520;
+                border: 1px solid #ACA096;
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #B09886;
+            }
+            QTableWidget {
+                background-color: #FFFFFF;
+                alternate-background-color: #FDFBF7;
+                gridline-color: #E5DFD5;
+                border: 1px solid #E5DFD5;
+                border-radius: 8px;
+                color: #2C2520;
+            }
+            QTableWidget::item {
+                padding: 6px;
+                color: #2C2520;
+            }
+            QTableWidget::item:selected {
+                background-color: #B09886;
+                color: #FFFFFF;
+            }
+            QHeaderView::section {
+                background-color: #F4EFE6;
+                color: #2C2520;
+                padding: 8px;
+                font-weight: bold;
+                border: none;
+                border-bottom: 2px solid #E5DFD5;
+            }
         """)
         
         self.codigo_seleccionado = None
         self.init_ui()
         self.cargar_grilla()
+
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -41,7 +82,7 @@ class BuscadorProductosDialog(QDialog):
         # Grilla
         self.tabla = QTableWidget(0, 6)
  
-        self.tabla.setHorizontalHeaderLabels(["Cód. Interno", "Cód. Barras", "Descripción", "Talle", "P. Contado", "Stock"])
+        self.tabla.setHorizontalHeaderLabels(["Cód. Interno", "Cód. Barras", "Nombre del Producto", "Talle", "P. Lista/Tarjeta", "Stock"])
         self.tabla.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)

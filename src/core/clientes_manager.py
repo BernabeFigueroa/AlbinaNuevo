@@ -40,3 +40,9 @@ class ClientesManager:
         supabase = get_supabase()
         supabase.table('clientes').update({'activo': False}).eq('id', cliente_id).execute()
         return True
+
+    # Aliases de compatibilidad con UI
+    crear_cliente = crear
+    actualizar_cliente = actualizar
+    eliminar_cliente = eliminar
+

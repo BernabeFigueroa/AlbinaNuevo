@@ -118,8 +118,31 @@ class ReportesView(QWidget):
         self.btn_generar.clicked.connect(self.generar_reportes)
         filtro_layout.addWidget(self.btn_generar)
         
+        self.btn_exportar_excel = QPushButton("Exportar Excel (Declaración)")
+        self.btn_exportar_excel.setStyleSheet("""
+            QPushButton {
+                background-color: #217346;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 15px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1e6b41;
+            }
+        """)
+        self.btn_exportar_excel.clicked.connect(self.exportar_excel_declaracion)
+        filtro_layout.addWidget(self.btn_exportar_excel)
+        
+        # Visibilidad según rol
+        from src.core.auth_manager import AuthManager
+        if not AuthManager.is_admin():
+            self.btn_exportar_excel.hide()
+        
         filtro_layout.addStretch()
         layout.addWidget(filtro_frame)
+
 
         # --- PESTAÑAS (TABS) ---
         self.tabs = QTabWidget()
@@ -399,6 +422,39 @@ class ReportesView(QWidget):
         except Exception as e:
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Error al generar reportes", f"Ocurrió un error: {str(e)}")
+
+    def exportar_excel_declaracion(self):
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        from src.core.auth_manager import AuthManager
+        
+        if not AuthManager.is_admin():
+            QMessageBox.warning(self, "Acceso Denegado", "Esta función está reservada únicamente para el usuario Administrador.")
+            return
+            
+        desde = self.dt_desde.date().toString("yyyy-MM-dd")
+        hasta = self.dt_hasta.date().toString("yyyy-MM-dd")
+        
+        sugerido = f"Declaracion_Ventas_{desde}_al_{hasta}.xlsx"
+        filepath, _ = QFileDialog.getSaveFileName(
+            self,
+            "Guardar Declaración de Ventas para Excel",
+            sugerido,
+            "Excel Workbook (*.xlsx);;Archivos CSV (*.csv)"
+        )
+        
+        if not filepath:
+            return
+            
+        try:
+            ReportesManager.generar_excel_declaracion_ventas(desde, hasta, filepath)
+            QMessageBox.information(
+                self, 
+                "Exportación Exitosa", 
+                f"La declaración de ventas fue exportada con éxito en:\n{filepath}"
+            )
+        except Exception as e:
+            QMessageBox.critical(self, "Error de Exportación", f"No se pudo generar la declaración:\n{str(e)}")
+
 
     def cargar_ventas(self, desde, hasta, usuario_id=None):
         metodo = self.cb_metodo_pago.currentText()

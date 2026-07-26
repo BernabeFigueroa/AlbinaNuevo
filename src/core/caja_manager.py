@@ -57,17 +57,30 @@ class CajaManager:
         return True
 
     @staticmethod
-    def registrar_movimiento(tipo: str, monto: float, metodo_pago: str, descripcion: str):
-        sesion = CajaManager.obtener_sesion_activa()
-        if not sesion:
-            raise Exception("Debe abrir la caja primero.")
-            
+    def registrar_movimiento(caja_sesion_id_or_tipo, tipo_or_monto, monto_or_metodo=None, metodo_pago_or_desc=None, descripcion=None):
+        if descripcion is not None:
+            # Se llamó como (caja_sesion_id, tipo, monto, metodo_pago, descripcion)
+            caja_sesion_id = caja_sesion_id_or_tipo
+            tipo = tipo_or_monto
+            monto = monto_or_metodo
+            metodo_pago = metodo_pago_or_desc
+        else:
+            # Se llamó como (tipo, monto, metodo_pago, descripcion)
+            sesion = CajaManager.obtener_sesion_activa()
+            if not sesion:
+                raise Exception("Debe abrir la caja primero.")
+            caja_sesion_id = sesion['id']
+            tipo = caja_sesion_id_or_tipo
+            monto = tipo_or_monto
+            metodo_pago = monto_or_metodo
+            descripcion = metodo_pago_or_desc
+
         user = AuthManager.get_current_user()
         usuario_id = user.id if user else None
 
         supabase = get_supabase()
         data = {
-            'caja_sesion_id': sesion['id'],
+            'caja_sesion_id': caja_sesion_id,
             'tipo': tipo.upper(),
             'monto': monto,
             'metodo_pago': metodo_pago,
@@ -76,6 +89,7 @@ class CajaManager:
         }
         supabase.table('caja_movimientos').insert(data).execute()
         return True
+
 
     @staticmethod
     def obtener_resumen(caja_sesion_id: int):
@@ -107,7 +121,7 @@ class CajaManager:
             mp = v['metodo_pago']
             if mp == 'EFECTIVO':
                 resumen['ventas_efectivo'] += total_v
-            elif mp in ['TRANSFERENCIA', 'TARJETA/TRANSFERENCIA']:
+            elif mp in ['TRANSFERENCIA', 'TARJETA', 'TARJETA/TRANSFERENCIA']:
                 resumen['ventas_transferencia'] += total_v
             elif mp == 'FIADO / CTA. CTE.':
                 resumen['ventas_fiadas'] += total_v
@@ -149,7 +163,7 @@ class CajaManager:
             elif tipo == 'PAGO_CTA_CTE':
                 if mp == 'EFECTIVO':
                     resumen['pagos_deuda_efectivo'] += monto_m
-                elif mp in ['TRANSFERENCIA', 'TARJETA/TRANSFERENCIA']:
+                elif mp in ['TRANSFERENCIA', 'TARJETA', 'TARJETA/TRANSFERENCIA']:
                     resumen['pagos_deuda_transferencia'] += monto_m
                     
         # 4. Calcular total efectivo esperado
