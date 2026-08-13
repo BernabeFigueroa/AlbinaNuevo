@@ -10,6 +10,8 @@ class ProveedoresManager:
         res = query.execute()
         return res.data
 
+
+
     @staticmethod
     def get_by_id(prov_id: int):
         supabase = get_supabase()

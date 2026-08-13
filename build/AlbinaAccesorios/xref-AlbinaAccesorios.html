@@ -3276,6 +3276,7 @@ imported by:
  &#8226;   <a href="#src.ui.productos_view">src.ui.productos_view</a>
  &#8226;   <a href="#src.ui.proveedores_view">src.ui.proveedores_view</a>
  &#8226;   <a href="#src.ui.reportes_view">src.ui.reportes_view</a>
+ &#8226;   <a href="#src.utils.async_worker">src.utils.async_worker</a>
 
   </div>
 
@@ -18393,6 +18394,7 @@ imported by:
  &#8226;   <a href="#realtime._async.client">realtime._async.client</a>
  &#8226;   <a href="#setuptools.config._validate_pyproject.error_reporting">setuptools.config._validate_pyproject.error_reporting</a>
  &#8226;   <a href="#setuptools.msvc">setuptools.msvc</a>
+ &#8226;   <a href="#src.core.auth_manager">src.core.auth_manager</a>
  &#8226;   <a href="#storage3._async.file_api">storage3._async.file_api</a>
  &#8226;   <a href="#storage3._sync.file_api">storage3._sync.file_api</a>
  &#8226;   <a href="#strenum._version">strenum._version</a>
@@ -35006,6 +35008,7 @@ imports:
   <div class="import">
 imported by:
     <a href="#src.core.auth_manager">src.core.auth_manager</a>
+ &#8226;   <a href="#src.core.cache_manager">src.core.cache_manager</a>
  &#8226;   <a href="#src.core.caja_manager">src.core.caja_manager</a>
  &#8226;   <a href="#src.core.categorias_manager">src.core.categorias_manager</a>
  &#8226;   <a href="#src.core.clientes_manager">src.core.clientes_manager</a>
@@ -35026,9 +35029,9 @@ imported by:
   <a target="code" href="///C:/Users/CS/OneDrive/Escritorio/%C2%BF/AlbinaNuevo/src/core/auth_manager.py" type="text/plain"><tt>src.core.auth_manager</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
-    <a href="#src.core">src.core</a>
+    <a href="#json">json</a>
+ &#8226;   <a href="#src.core">src.core</a>
  &#8226;   <a href="#src.db.database">src.db.database</a>
- &#8226;   <a href="#traceback">traceback</a>
 
   </div>
   <div class="import">
@@ -35041,6 +35044,33 @@ imported by:
  &#8226;   <a href="#src.ui.login_window">src.ui.login_window</a>
  &#8226;   <a href="#src.ui.main_window">src.ui.main_window</a>
  &#8226;   <a href="#src.ui.reportes_view">src.ui.reportes_view</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="src.core.cache_manager"></a>
+  <a target="code" href="///C:/Users/CS/OneDrive/Escritorio/%C2%BF/AlbinaNuevo/src/core/cache_manager.py" type="text/plain"><tt>src.core.cache_manager</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#src.core">src.core</a>
+ &#8226;   <a href="#src.core.categorias_manager">src.core.categorias_manager</a>
+ &#8226;   <a href="#src.core.clientes_manager">src.core.clientes_manager</a>
+ &#8226;   <a href="#src.core.productos_manager">src.core.productos_manager</a>
+ &#8226;   <a href="#src.core.proveedores_manager">src.core.proveedores_manager</a>
+ &#8226;   <a href="#time">time</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#src.core.clientes_manager">src.core.clientes_manager</a>
+ &#8226;   <a href="#src.core.productos_manager">src.core.productos_manager</a>
+ &#8226;   <a href="#src.ui.buscador_clientes">src.ui.buscador_clientes</a>
+ &#8226;   <a href="#src.ui.buscador_productos">src.ui.buscador_productos</a>
+ &#8226;   <a href="#src.ui.main_window">src.ui.main_window</a>
+ &#8226;   <a href="#src.ui.pos_view">src.ui.pos_view</a>
+ &#8226;   <a href="#src.ui.productos_view">src.ui.productos_view</a>
 
   </div>
 
@@ -35083,7 +35113,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#src.ui.categorias_view">src.ui.categorias_view</a>
+    <a href="#src.core.cache_manager">src.core.cache_manager</a>
+ &#8226;   <a href="#src.ui.categorias_view">src.ui.categorias_view</a>
  &#8226;   <a href="#src.ui.productos_view">src.ui.productos_view</a>
 
   </div>
@@ -35096,12 +35127,14 @@ imported by:
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#src.core">src.core</a>
+ &#8226;   <a href="#src.core.cache_manager">src.core.cache_manager</a>
  &#8226;   <a href="#src.db.database">src.db.database</a>
 
   </div>
   <div class="import">
 imported by:
-    <a href="#src.ui.buscador_clientes">src.ui.buscador_clientes</a>
+    <a href="#src.core.cache_manager">src.core.cache_manager</a>
+ &#8226;   <a href="#src.ui.buscador_clientes">src.ui.buscador_clientes</a>
  &#8226;   <a href="#src.ui.clientes_view">src.ui.clientes_view</a>
  &#8226;   <a href="#src.ui.deudores_view">src.ui.deudores_view</a>
  &#8226;   <a href="#src.ui.pos_view">src.ui.pos_view</a>
@@ -35155,12 +35188,14 @@ imported by:
 imports:
     <a href="#src.core">src.core</a>
  &#8226;   <a href="#src.core.auth_manager">src.core.auth_manager</a>
+ &#8226;   <a href="#src.core.cache_manager">src.core.cache_manager</a>
  &#8226;   <a href="#src.db.database">src.db.database</a>
 
   </div>
   <div class="import">
 imported by:
-    <a href="#src.ui.buscador_productos">src.ui.buscador_productos</a>
+    <a href="#src.core.cache_manager">src.core.cache_manager</a>
+ &#8226;   <a href="#src.ui.buscador_productos">src.ui.buscador_productos</a>
  &#8226;   <a href="#src.ui.pos_view">src.ui.pos_view</a>
  &#8226;   <a href="#src.ui.productos_view">src.ui.productos_view</a>
 
@@ -35196,7 +35231,8 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#src.ui.deudas_proveedores_view">src.ui.deudas_proveedores_view</a>
+    <a href="#src.core.cache_manager">src.core.cache_manager</a>
+ &#8226;   <a href="#src.ui.deudas_proveedores_view">src.ui.deudas_proveedores_view</a>
  &#8226;   <a href="#src.ui.productos_view">src.ui.productos_view</a>
  &#8226;   <a href="#src.ui.proveedores_view">src.ui.proveedores_view</a>
 
@@ -35326,6 +35362,7 @@ imported by:
 imports:
     <a href="#PyQt6.QtCore">PyQt6.QtCore</a>
  &#8226;   <a href="#PyQt6.QtWidgets">PyQt6.QtWidgets</a>
+ &#8226;   <a href="#src.core.cache_manager">src.core.cache_manager</a>
  &#8226;   <a href="#src.core.clientes_manager">src.core.clientes_manager</a>
  &#8226;   <a href="#src.ui">src.ui</a>
 
@@ -35345,6 +35382,7 @@ imported by:
 imports:
     <a href="#PyQt6.QtCore">PyQt6.QtCore</a>
  &#8226;   <a href="#PyQt6.QtWidgets">PyQt6.QtWidgets</a>
+ &#8226;   <a href="#src.core.cache_manager">src.core.cache_manager</a>
  &#8226;   <a href="#src.core.productos_manager">src.core.productos_manager</a>
  &#8226;   <a href="#src.core.promociones_manager">src.core.promociones_manager</a>
  &#8226;   <a href="#src.ui">src.ui</a>
@@ -35475,6 +35513,7 @@ imports:
  &#8226;   <a href="#src.core.auth_manager">src.core.auth_manager</a>
  &#8226;   <a href="#src.ui">src.ui</a>
  &#8226;   <a href="#src.ui.main_window">src.ui.main_window</a>
+ &#8226;   <a href="#src.utils.async_worker">src.utils.async_worker</a>
  &#8226;   <a href="#sys">sys</a>
 
   </div>
@@ -35497,6 +35536,7 @@ imports:
  &#8226;   <a href="#PyQt6.QtWidgets">PyQt6.QtWidgets</a>
  &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#src.core.auth_manager">src.core.auth_manager</a>
+ &#8226;   <a href="#src.core.cache_manager">src.core.cache_manager</a>
  &#8226;   <a href="#src.ui">src.ui</a>
  &#8226;   <a href="#src.ui.caja_view">src.ui.caja_view</a>
  &#8226;   <a href="#src.ui.categorias_view">src.ui.categorias_view</a>
@@ -35508,6 +35548,7 @@ imports:
  &#8226;   <a href="#src.ui.productos_view">src.ui.productos_view</a>
  &#8226;   <a href="#src.ui.proveedores_view">src.ui.proveedores_view</a>
  &#8226;   <a href="#src.ui.reportes_view">src.ui.reportes_view</a>
+ &#8226;   <a href="#src.utils.async_worker">src.utils.async_worker</a>
  &#8226;   <a href="#sys">sys</a>
 
   </div>
@@ -35528,6 +35569,7 @@ imports:
  &#8226;   <a href="#PyQt6.QtGui">PyQt6.QtGui</a>
  &#8226;   <a href="#PyQt6.QtWidgets">PyQt6.QtWidgets</a>
  &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#src.core.cache_manager">src.core.cache_manager</a>
  &#8226;   <a href="#src.core.caja_manager">src.core.caja_manager</a>
  &#8226;   <a href="#src.core.clientes_manager">src.core.clientes_manager</a>
  &#8226;   <a href="#src.core.cta_cte_manager">src.core.cta_cte_manager</a>
@@ -35557,6 +35599,7 @@ imports:
     <a href="#PyQt6.QtCore">PyQt6.QtCore</a>
  &#8226;   <a href="#PyQt6.QtGui">PyQt6.QtGui</a>
  &#8226;   <a href="#PyQt6.QtWidgets">PyQt6.QtWidgets</a>
+ &#8226;   <a href="#src.core.cache_manager">src.core.cache_manager</a>
  &#8226;   <a href="#src.core.categorias_manager">src.core.categorias_manager</a>
  &#8226;   <a href="#src.core.productos_manager">src.core.productos_manager</a>
  &#8226;   <a href="#src.core.proveedores_manager">src.core.proveedores_manager</a>
@@ -35624,7 +35667,26 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#src.utils.impresion_ticket">src.utils.impresion_ticket</a>
+    <a href="#src.utils.async_worker">src.utils.async_worker</a>
+ &#8226;   <a href="#src.utils.impresion_ticket">src.utils.impresion_ticket</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="src.utils.async_worker"></a>
+  <a target="code" href="///C:/Users/CS/OneDrive/Escritorio/%C2%BF/AlbinaNuevo/src/utils/async_worker.py" type="text/plain"><tt>src.utils.async_worker</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#PyQt6.QtCore">PyQt6.QtCore</a>
+ &#8226;   <a href="#src.utils">src.utils</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#src.ui.login_window">src.ui.login_window</a>
+ &#8226;   <a href="#src.ui.main_window">src.ui.main_window</a>
 
   </div>
 
@@ -38157,6 +38219,7 @@ imported by:
  &#8226;   <a href="#setuptools._vendor.wheel.wheelfile">setuptools._vendor.wheel.wheelfile</a>
  &#8226;   <a href="#setuptools.command.egg_info">setuptools.command.egg_info</a>
  &#8226;   <a href="#socketserver">socketserver</a>
+ &#8226;   <a href="#src.core.cache_manager">src.core.cache_manager</a>
  &#8226;   <a href="#ssl">ssl</a>
  &#8226;   <a href="#subprocess">subprocess</a>
  &#8226;   <a href="#supabase_auth._async.gotrue_client">supabase_auth._async.gotrue_client</a>
@@ -38388,7 +38451,6 @@ imported by:
  &#8226;   <a href="#pydoc">pydoc</a>
  &#8226;   <a href="#site">site</a>
  &#8226;   <a href="#socketserver">socketserver</a>
- &#8226;   <a href="#src.core.auth_manager">src.core.auth_manager</a>
  &#8226;   <a href="#threading">threading</a>
  &#8226;   <a href="#unittest.case">unittest.case</a>
  &#8226;   <a href="#unittest.loader">unittest.loader</a>

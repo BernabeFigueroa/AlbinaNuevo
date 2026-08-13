@@ -113,8 +113,9 @@ class BuscadorProductosDialog(QDialog):
         return super().eventFilter(source, event)
 
     def cargar_grilla(self, filtro=""):
+        from src.core.cache_manager import DataCache
         self.tabla.setRowCount(0)
-        productos = ProductosManager.get_all()
+        productos = DataCache.get_productos()
         for p in productos:
             coincide_nombre = filtro.lower() in p['nombre'].lower()
             coincide_barras = bool(p['codigo_barras'] and filtro in p['codigo_barras'])

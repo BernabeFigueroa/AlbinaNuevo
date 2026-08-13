@@ -35,14 +35,15 @@ class ProductosView(QWidget):
         return frame
 
     def cargar_combos(self):
+        from src.core.cache_manager import DataCache
         # Guardar selecciones actuales
         cur_cat = self.cb_categoria.currentData() if hasattr(self, 'cb_categoria') else None
         cur_prov = self.cb_proveedor.currentData() if hasattr(self, 'cb_proveedor') else None
         cur_filtro_cat = self.cb_filtro_categoria.currentData() if hasattr(self, 'cb_filtro_categoria') else None
         cur_filtro_prov = self.cb_filtro_proveedor.currentData() if hasattr(self, 'cb_filtro_proveedor') else None
 
-        cats = CategoriasManager.get_all()
-        provs = ProveedoresManager.get_all()
+        cats = DataCache.get_categorias()
+        provs = DataCache.get_proveedores()
 
         if hasattr(self, 'cb_categoria'):
             self.cb_categoria.blockSignals(True)
@@ -229,6 +230,10 @@ class ProductosView(QWidget):
         self.btn_ficha.clicked.connect(self.ver_ficha_producto)
         self.btn_ficha.setEnabled(False)
 
+        self.btn_imprimir_etiqueta = QPushButton("Imprimir Etiqueta")
+        self.btn_imprimir_etiqueta.setObjectName("btn_neutral")
+        self.btn_imprimir_etiqueta.clicked.connect(self.abrir_impresor_etiquetas)
+
         self.btn_grabar = QPushButton("Guardar (F5)")
         self.btn_grabar.setObjectName("btn_primary")
 
@@ -247,6 +252,7 @@ class ProductosView(QWidget):
         btn_layout.addWidget(self.btn_eliminar)
         btn_layout.addWidget(self.btn_restaurar)
         btn_layout.addWidget(self.btn_ficha)
+        btn_layout.addWidget(self.btn_imprimir_etiqueta)
         btn_layout.addStretch()
         btn_layout.addWidget(self.btn_duplicar)
         btn_layout.addWidget(self.btn_grabar)
@@ -342,9 +348,10 @@ class ProductosView(QWidget):
             pass
 
     def cargar_grilla(self, filtro=""):
+        from src.core.cache_manager import DataCache
         self.tabla.setRowCount(0)
         incluir_inactivos = hasattr(self, 'chk_inactivos') and self.chk_inactivos.isChecked()
-        productos = ProductosManager.get_all(incluir_inactivos=incluir_inactivos)
+        productos = DataCache.get_productos(incluir_inactivos=incluir_inactivos)
         
         cat_filtro = self.cb_filtro_categoria.currentData() if hasattr(self, 'cb_filtro_categoria') else None
         prov_filtro = self.cb_filtro_proveedor.currentData() if hasattr(self, 'cb_filtro_proveedor') else None
@@ -367,15 +374,17 @@ class ProductosView(QWidget):
                     coincide = True
                 elif filtro_lower == str(p['id']):
                     coincide = True
-                
                 if not coincide:
                     continue
             
             row_idx = self.tabla.rowCount()
             self.tabla.insertRow(row_idx)
-            # Mostrar ID interno si no tiene código de barras
-            codigo_mostrar = p['codigo_barras'] if p['codigo_barras'] else f"[{p['id']}]"
+            
+
+            # Mostrar ID interno como el código y centrarlo
+            codigo_mostrar = str(p['id'])
             item_codigo = QTableWidgetItem(codigo_mostrar)
+            item_codigo.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             item_codigo.setData(Qt.ItemDataRole.UserRole, p['id']) # ID Oculto
             self.tabla.setItem(row_idx, 0, item_codigo)
             
@@ -402,28 +411,30 @@ class ProductosView(QWidget):
             
         self.producto_seleccionado_id = producto['id']
         self.txt_codigo_interno.setText(str(producto['id']))
-        self.txt_codigo_barras.setText(producto['codigo_barras'] or "")
-        self.txt_codigo_fabrica.setText(producto['codigo_fabrica'] or "")
+        self.txt_codigo_barras.setText(producto.get('codigo_barras') or "")
+        self.txt_codigo_fabrica.setText(producto.get('codigo_fabrica') or "")
         self.txt_descripcion.setText(producto['nombre'])
         
-        idx_cat = self.cb_categoria.findData(producto['categoria_id'])
+        idx_cat = self.cb_categoria.findData(producto.get('categoria_id'))
         if idx_cat >= 0:
             self.cb_categoria.setCurrentIndex(idx_cat)
             
-        idx_prov = self.cb_proveedor.findData(producto['proveedor_id'])
+        idx_prov = self.cb_proveedor.findData(producto.get('proveedor_id'))
         if idx_prov >= 0:
             self.cb_proveedor.setCurrentIndex(idx_prov)
-                
-        self.txt_costo_lista.setText(f"{producto['costo_lista']:.2f}")
-        self.txt_flete.setText(f"{producto['flete']:.2f}")
-        self.txt_utilidad.setText(f"{producto['utilidad_porcentaje']:.2f}")
-        self.txt_precio_contado.setText(f"{producto['precio_contado']:.2f}")
-        self.txt_precio_tarjeta.setText(f"{producto['precio_tarjeta']:.2f}")
+                 
+        self.txt_costo_lista.setText(f"{producto.get('costo_lista', 0.0):.2f}")
+        self.txt_flete.setText(f"{producto.get('flete', 0.0):.2f}")
+        self.txt_utilidad.setText(f"{producto.get('utilidad_porcentaje', 0.0):.2f}")
+        self.txt_precio_contado.setText(f"{producto.get('precio_contado', 0.0):.2f}")
+        self.txt_precio_tarjeta.setText(f"{producto.get('precio_tarjeta', 0.0):.2f}")
         
-        self.txt_stock_actual.setText(str(producto['stock_actual']))
-        self.txt_stock_min.setText(str(producto['stock_minimo']))
-        self.txt_stock_max.setText(str(producto['stock_maximo']))
-        self.txt_ubicacion.setText(producto['ubicacion'] or "")
+        self.txt_stock_actual.setText(str(producto.get('stock_actual', 0)))
+
+
+        self.txt_stock_min.setText(str(producto.get('stock_minimo', 5)))
+        self.txt_stock_max.setText(str(producto.get('stock_maximo', 100)))
+        self.txt_ubicacion.setText(producto.get('ubicacion') or "")
         self.txt_talle.setText(producto.get('talle') or "")
         
         creado = "Desconocido"
@@ -504,6 +515,11 @@ class ProductosView(QWidget):
                 self.cargar_grilla(self.txt_buscar.text())
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"No se pudo restaurar:\n{str(e)}")
+
+    def abrir_impresor_etiquetas(self):
+        from src.ui.impresor_etiquetas_dialog import ImpresorEtiquetasDialog
+        dialog = ImpresorEtiquetasDialog(producto_inicial_id=self.producto_seleccionado_id, parent=self)
+        dialog.exec()
 
     def duplicar_producto(self):
         row = self.tabla.currentRow()

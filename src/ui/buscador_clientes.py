@@ -108,8 +108,9 @@ class BuscadorClientesDialog(QDialog):
         return super().eventFilter(source, event)
 
     def cargar_grilla(self, filtro=""):
+        from src.core.cache_manager import DataCache
         self.tabla.setRowCount(0)
-        clientes = ClientesManager.get_all()
+        clientes = DataCache.get_clientes()
         for c in clientes:
             coincide_nombre = filtro.lower() in c['nombre'].lower()
             coincide_cuit = bool(c['cuit'] and filtro in c['cuit'])

@@ -8,6 +8,14 @@ class ProductosManager:
             raise PermissionError("Acceso Denegado: Debe iniciar sesión para modificar productos.")
 
     @staticmethod
+    def _invalidate_cache():
+        try:
+            from src.core.cache_manager import DataCache
+            DataCache.invalidate_productos()
+        except Exception:
+            pass
+
+    @staticmethod
     def get_all(incluir_inactivos=False):
         supabase = get_supabase()
         query = supabase.table('productos').select('*, categorias(nombre), proveedores(nombre)')
@@ -15,7 +23,7 @@ class ProductosManager:
             query = query.eq('activo', True)
         res = query.execute()
         
-        # Reformatear para que la UI reciba diccionarios planos como sqlite.Row
+        # Reformatear para que la UI reciba diccionarios planos
         productos = []
         for p in res.data:
             prod = p.copy()
@@ -76,6 +84,7 @@ class ProductosManager:
             'activo': True
         }
         res = supabase.table('productos').insert(data).execute()
+        ProductosManager._invalidate_cache()
         return res.data[0]['id']
 
     @staticmethod
@@ -99,6 +108,7 @@ class ProductosManager:
             'modificado_por': usuario_id
         }
         supabase.table('productos').update(data).eq('id', producto_id).execute()
+        ProductosManager._invalidate_cache()
         return True
 
     @staticmethod
@@ -106,6 +116,7 @@ class ProductosManager:
         ProductosManager._check_permission()
         supabase = get_supabase()
         supabase.table('productos').update({'activo': False}).eq('id', producto_id).execute()
+        ProductosManager._invalidate_cache()
         return True
 
     @staticmethod
@@ -113,6 +124,7 @@ class ProductosManager:
         ProductosManager._check_permission()
         supabase = get_supabase()
         supabase.table('productos').update({'activo': True}).eq('id', producto_id).execute()
+        ProductosManager._invalidate_cache()
         return True
 
     @staticmethod
@@ -123,29 +135,29 @@ class ProductosManager:
         if res.data:
             nuevo_stock = float(res.data[0]['stock_actual']) + cantidad_cambio
             supabase.table('productos').update({'stock_actual': nuevo_stock}).eq('id', producto_id).execute()
+            ProductosManager._invalidate_cache()
+
 
     @staticmethod
     def get_historial_producto(producto_id: int):
         supabase = get_supabase()
         try:
-            res = supabase.table('ventas_detalle').select(
-                'cantidad, precio_unitario, subtotal, ventas!inner(fecha, metodo_pago, estado, clientes(nombre))'
-            ).eq('producto_id', producto_id).neq('ventas.estado', 'CANCELADA').order('fecha', foreign_table='ventas', desc=True).execute()
-        except Exception as e:
-            res = supabase.table('ventas_detalle').select(
-                'cantidad, precio_unitario, subtotal, ventas!inner(fecha, metodo_pago, estado, clientes(nombre))'
-            ).eq('producto_id', producto_id).neq('ventas.estado', 'CANCELADA').execute()
+            res = supabase.table('sale_items').select(
+                'quantity, unit_price, line_total, sales!inner(created_at, payment_method, status)'
+            ).eq('product_id', producto_id).neq('sales.status', 'CANCELLED').execute()
+        except Exception:
+            return []
         
         historial = []
         for d in res.data:
-            v = d['ventas']
-            c = v.get('clientes')
+            v = d['sales']
             historial.append({
-                'fecha': v['fecha'],
-                'cliente': c['nombre'] if c else 'Consumidor Final',
-                'cantidad': d['cantidad'],
-                'precio_unitario': d['precio_unitario'],
-                'subtotal': d['subtotal'],
-                'metodo_pago': v['metodo_pago']
+                'fecha': v['created_at'],
+                'cliente': 'Consumidor Final',
+                'cantidad': d['quantity'],
+                'precio_unitario': d['unit_price'],
+                'subtotal': d['line_total'],
+                'metodo_pago': v['payment_method']
             })
         return historial
+

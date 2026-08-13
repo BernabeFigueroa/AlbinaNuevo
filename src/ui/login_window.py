@@ -99,15 +99,23 @@ class LoginWindow(QWidget):
         self.login_btn.setText("Conectando...")
         self.login_btn.setEnabled(False)
         
-        # Autenticar
-        success = AuthManager.login(email, password)
+        from src.utils.async_worker import run_async
         
-        if success:
-            self.open_main_window()
-        else:
-            QMessageBox.critical(self, "Error", "Correo o contraseña incorrectos, o error de conexión.")
+        def on_result(result):
+            success, err_msg = result
+            if success:
+                self.open_main_window()
+            else:
+                QMessageBox.critical(self, "Error de Ingreso", err_msg)
+                self.login_btn.setText("Iniciar Sesión")
+                self.login_btn.setEnabled(True)
+
+        def on_error(err):
+            QMessageBox.critical(self, "Error", f"Ocurrió un error inesperado: {err}")
             self.login_btn.setText("Iniciar Sesión")
             self.login_btn.setEnabled(True)
+
+        run_async(AuthManager.login, email, password, on_result=on_result, on_error=on_error)
             
     def toggle_password(self):
         import os, sys
