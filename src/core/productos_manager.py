@@ -84,14 +84,19 @@ class ProductosManager:
             'activo': True
         }
         res = supabase.table('productos').insert(data).execute()
+        new_id = res.data[0]['id']
+        if not codigo_barras:
+            # Asignar automáticamente un código de barras único de 12 dígitos por defecto
+            default_barcode = f"200{new_id:09d}"
+            supabase.table('productos').update({'codigo_barras': default_barcode}).eq('id', new_id).execute()
         ProductosManager._invalidate_cache()
-        return res.data[0]['id']
+        return new_id
 
     @staticmethod
     def actualizar_producto(producto_id, codigo_barras, nombre, costo_lista, flete, utilidad_porcentaje, precio_contado, precio_tarjeta, stock_actual, stock_minimo, stock_maximo=100.0, categoria_id=None, proveedor_id=None, codigo_fabrica="", unidades_bulto=1, ubicacion="", observaciones="", talle=""):
         ProductosManager._check_permission()
         costo_final = float(costo_lista) + float(flete)
-        codigo_barras = codigo_barras.strip() if codigo_barras and codigo_barras.strip() else None
+        codigo_barras = codigo_barras.strip() if codigo_barras and codigo_barras.strip() else f"200{producto_id:09d}"
         
         user = AuthManager.get_current_user()
         usuario_id = user.id if user else None
@@ -142,22 +147,39 @@ class ProductosManager:
     def get_historial_producto(producto_id: int):
         supabase = get_supabase()
         try:
-            res = supabase.table('sale_items').select(
-                'quantity, unit_price, line_total, sales!inner(created_at, payment_method, status)'
-            ).eq('product_id', producto_id).neq('sales.status', 'CANCELLED').execute()
-        except Exception:
+            res = supabase.table('ventas_detalle').select(
+                'cantidad, precio_unitario, subtotal, ventas!inner(fecha, metodo_pago, estado, clientes(nombre))'
+            ).eq('producto_id', producto_id).execute()
+        except Exception as e:
+            print(f"Error al obtener historial: {e}")
             return []
         
         historial = []
         for d in res.data:
-            v = d['sales']
+            v = d.get('ventas') or {}
+            if v.get('estado') == 'CANCELADA':
+                continue
+            
+            cliente_info = v.get('clientes') or {}
+            cliente_nombre = cliente_info.get('nombre') or 'Consumidor Final'
+            
+            # Formatear fecha
+            fecha_str = v.get('fecha')
+            try:
+                # v['fecha'] suele ser formato ISO: '2026-08-13T05:32:32Z' o similar
+                from datetime import datetime
+                fecha_dt = datetime.fromisoformat(fecha_str.replace('Z', '+00:00'))
+                fecha_str = fecha_dt.strftime('%d/%m/%Y %H:%M')
+            except Exception:
+                pass
+                
             historial.append({
-                'fecha': v['created_at'],
-                'cliente': 'Consumidor Final',
-                'cantidad': d['quantity'],
-                'precio_unitario': d['unit_price'],
-                'subtotal': d['line_total'],
-                'metodo_pago': v['payment_method']
+                'fecha': fecha_str,
+                'cliente': cliente_nombre,
+                'cantidad': d.get('cantidad'),
+                'precio_unitario': float(d.get('precio_unitario', 0.0)),
+                'subtotal': float(d.get('subtotal', 0.0)),
+                'metodo_pago': v.get('metodo_pago', '')
             })
         return historial
 

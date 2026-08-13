@@ -36,13 +36,11 @@ def generar_barcode_pixmap(codigo: str) -> QPixmap:
         buffer.seek(0)
         pil_img = Image.open(buffer)
         
-        # Convertir PIL Image a QPixmap
-        if pil_img.mode != "RGBA":
-            pil_img = pil_img.convert("RGBA")
-        
-        data = pil_img.tobytes("raw", "RGBA")
-        qimage = QImage(data, pil_img.width, pil_img.height, QImage.Format.Format_RGBA8888)
-        pixmap = QPixmap.fromImage(qimage)
+        # Convertir PIL Image a QPixmap de forma segura usando un buffer PNG
+        buffer_png = io.BytesIO()
+        pil_img.save(buffer_png, format="PNG")
+        pixmap = QPixmap()
+        pixmap.loadFromData(buffer_png.getvalue())
         return pixmap
         
     except Exception as e:

@@ -411,7 +411,7 @@ class ProductosView(QWidget):
             
         self.producto_seleccionado_id = producto['id']
         self.txt_codigo_interno.setText(str(producto['id']))
-        self.txt_codigo_barras.setText(producto.get('codigo_barras') or "")
+        self.txt_codigo_barras.setText(producto.get('codigo_barras') or f"1{producto['id']:05d}")
         self.txt_codigo_fabrica.setText(producto.get('codigo_fabrica') or "")
         self.txt_descripcion.setText(producto['nombre'])
         
@@ -628,56 +628,112 @@ class ProductosView(QWidget):
             def __init__(self, parent=None, producto_nombre="", historial_data=None):
                 super().__init__(parent)
                 self.setWindowTitle(f"Ficha / Historial: {producto_nombre}")
-                self.setMinimumSize(700, 400)
+                self.setMinimumSize(750, 450)
                 self.setStyleSheet("""
-                    QDialog { background-color: #FFFFFF; border: 1px solid #E5DFD5; border-radius: 8px; }
-                    QLabel { color: #000000; font-size: 14px; }
-                    
+                    QDialog {
+                        background-color: #FAF8F5;
+                    }
+                    QLabel {
+                        color: #2C2520;
+                        font-size: 14px;
+                    }
+                    QTableWidget {
+                        background-color: #FFFFFF;
+                        alternate-background-color: #FDFBF7;
+                        gridline-color: #E5DFD5;
+                        border: 1px solid #E5DFD5;
+                        border-radius: 8px;
+                        color: #2C2520;
+                    }
                     QHeaderView::section {
-                        background-color: #FFFFFF; border: 1px solid #E5DFD5; border-radius: 8px;
-                        color: #666666;
+                        background-color: #F4EFE6;
+                        color: #2C2520;
                         padding: 8px;
                         border: none;
                         font-weight: bold;
                         border-bottom: 2px solid #E5DFD5;
                     }
                     QPushButton {
-                        background-color: #E5DFD5;
-                        color: #000000;
+                        background-color: #B09886;
+                        color: #FFFFFF;
                         border: none;
-                        border-radius: 6px;
+                        border-radius: 8px;
                         padding: 8px 20px;
                         font-weight: bold;
+                        font-size: 13px;
                     }
-                    QPushButton:hover { background-color: #B09886; color: #FAF8F5; }
+                    QPushButton:hover {
+                        background-color: #9C8573;
+                    }
+                    QPushButton:pressed {
+                        background-color: #8C7869;
+                    }
                 """)
                 
                 layout = QVBoxLayout(self)
+                layout.setContentsMargins(20, 20, 20, 20)
+                layout.setSpacing(15)
                 
                 lbl_titulo = QLabel(f"Movimientos de: {producto_nombre}")
                 lbl_titulo.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
-                lbl_titulo.setStyleSheet("color: #000000;")
+                lbl_titulo.setStyleSheet("color: #2C2520;")
                 layout.addWidget(lbl_titulo)
                 
                 tabla = QTableWidget(0, 6)
                 tabla.setHorizontalHeaderLabels(["Fecha", "Cliente", "Método Pago", "Cant.", "Precio Unit.", "Subtotal"])
+                tabla.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
                 tabla.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+                tabla.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+                tabla.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+                tabla.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+                tabla.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+                
                 tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
                 tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+                tabla.setAlternatingRowColors(True)
                 
                 for mov in historial_data:
                     row = tabla.rowCount()
                     tabla.insertRow(row)
-                    tabla.setItem(row, 0, QTableWidgetItem(mov['fecha']))
-                    tabla.setItem(row, 1, QTableWidgetItem(mov['cliente']))
-                    tabla.setItem(row, 2, QTableWidgetItem(mov['metodo_pago']))
-                    tabla.setItem(row, 3, QTableWidgetItem(str(mov['cantidad'])))
-                    tabla.setItem(row, 4, QTableWidgetItem(f"${mov['precio_unitario']:.2f}"))
-                    tabla.setItem(row, 5, QTableWidgetItem(f"${mov['subtotal']:.2f}"))
+                    
+                    # Fecha (Centrada)
+                    item_fecha = QTableWidgetItem(mov['fecha'])
+                    item_fecha.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    tabla.setItem(row, 0, item_fecha)
+                    
+                    # Cliente (Alineado izquierda)
+                    item_cliente = QTableWidgetItem(mov['cliente'])
+                    item_cliente.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+                    tabla.setItem(row, 1, item_cliente)
+                    
+                    # Método Pago (Centrado)
+                    item_mp = QTableWidgetItem(mov['metodo_pago'])
+                    item_mp.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    tabla.setItem(row, 2, item_mp)
+                    
+                    # Cantidad (Centrado, sin decimales si es entero)
+                    cant = mov['cantidad']
+                    cant_str = str(int(cant)) if float(cant).is_integer() else f"{cant:.2f}"
+                    item_cant = QTableWidgetItem(cant_str)
+                    item_cant.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    tabla.setItem(row, 3, item_cant)
+                    
+                    # Precio Unitario (Derecha con espacio y coma)
+                    precio = float(mov['precio_unitario'])
+                    item_precio = QTableWidgetItem(f"$ {precio:,.2f}")
+                    item_precio.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                    tabla.setItem(row, 4, item_precio)
+                    
+                    # Subtotal (Derecha con espacio y coma)
+                    subtotal = float(mov['subtotal'])
+                    item_subtotal = QTableWidgetItem(f"$ {subtotal:,.2f}")
+                    item_subtotal.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                    tabla.setItem(row, 5, item_subtotal)
                 
                 layout.addWidget(tabla)
                 
                 btn_cerrar = QPushButton("Cerrar")
+                btn_cerrar.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn_cerrar.clicked.connect(self.accept)
                 btn_layout = QHBoxLayout()
                 btn_layout.addStretch()

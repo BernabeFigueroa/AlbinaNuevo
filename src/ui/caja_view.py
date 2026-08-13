@@ -130,10 +130,23 @@ class CajaView(QWidget):
         mov_layout.addLayout(grid_mov)
 
         self.btn_registrar_mov = QPushButton("REGISTRAR MOVIMIENTO")
-        self.btn_registrar_mov.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self.btn_registrar_mov.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        self.btn_registrar_mov.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_registrar_mov.setStyleSheet("""
-            QPushButton { background-color: #000000; color: #000000; border-radius: 6px; padding: 12px; }
-            QPushButton:hover { background-color: #BDE7F7; }
+            QPushButton {
+                background-color: #B09886;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 8px;
+                padding: 10px;
+                min-height: 40px;
+            }
+            QPushButton:hover {
+                background-color: #9C8573;
+            }
+            QPushButton:pressed {
+                background-color: #8C7869;
+            }
         """)
         self.btn_registrar_mov.clicked.connect(self.registrar_movimiento)
         mov_layout.addWidget(self.btn_registrar_mov)
@@ -314,17 +327,31 @@ class CajaView(QWidget):
             row = self.tabla_movs.rowCount()
             self.tabla_movs.insertRow(row)
             
-            self.tabla_movs.setItem(row, 0, QTableWidgetItem(m['fecha']))
+            fecha_str = m.get('fecha') or ''
+            try:
+                fecha_dt = datetime.fromisoformat(fecha_str.replace('Z', '+00:00'))
+                fecha_str = fecha_dt.strftime('%d/%m/%Y %H:%M')
+            except Exception:
+                pass
+            item_fecha = QTableWidgetItem(fecha_str)
+            item_fecha.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.tabla_movs.setItem(row, 0, item_fecha)
             
             item_tipo = QTableWidgetItem(m['tipo'])
+            item_tipo.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             if 'INGRESO' in m['tipo'] or 'VENTA' in m['tipo'] or m['tipo'] == 'PAGO_CTA_CTE':
                 item_tipo.setForeground(Qt.GlobalColor.green)
             else:
                 item_tipo.setForeground(Qt.GlobalColor.red)
             self.tabla_movs.setItem(row, 1, item_tipo)
             
-            self.tabla_movs.setItem(row, 2, QTableWidgetItem(m['descripcion']))
-            self.tabla_movs.setItem(row, 3, QTableWidgetItem(f"$ {m['monto']:,.2f}"))
+            item_desc = QTableWidgetItem(m['descripcion'])
+            item_desc.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            self.tabla_movs.setItem(row, 2, item_desc)
+            
+            item_monto = QTableWidgetItem(f"$ {m['monto']:,.2f}")
+            item_monto.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.tabla_movs.setItem(row, 3, item_monto)
 
     def cerrar_caja(self):
         if not self.sesion_activa:

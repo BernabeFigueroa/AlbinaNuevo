@@ -12,15 +12,16 @@ class CajaManager:
     def obtener_sesion_activa():
         supabase = get_supabase()
         try:
-            res = supabase.table('cash_register_sessions').select('*').eq('status', 'OPEN').execute()
+            res = supabase.table('caja_sesiones').select('*').eq('estado', 'ABIERTA').execute()
             if res.data:
-                # Mantener compatibilidad con mapeo antiguo
                 sesion = res.data[0].copy()
-                sesion['monto_inicial'] = float(sesion.get('opening_amount', 0.0))
-                sesion['estado'] = 'ABIERTA' if sesion.get('status') == 'OPEN' else 'CERRADA'
+                # La UI de PyQt6 espera que la sesión activa devuelta tenga 'monto_inicial' y 'estado' ('ABIERTA' o 'CERRADA')
+                sesion['monto_inicial'] = float(sesion.get('monto_inicial', 0.0))
+                sesion['estado'] = 'ABIERTA'
                 return sesion
             return None
-        except Exception:
+        except Exception as e:
+            print(f"Error en obtener_sesion_activa: {e}")
             return None
 
     @staticmethod
@@ -34,24 +35,25 @@ class CajaManager:
 
         supabase = get_supabase()
         data = {
-            'opening_amount': monto_inicial,
-            'status': 'OPEN',
-            'opened_by': usuario_id
+            'monto_inicial': monto_inicial,
+            'estado': 'ABIERTA',
+            'usuario_id': usuario_id
         }
-        res = supabase.table('cash_register_sessions').insert(data).execute()
+        res = supabase.table('caja_sesiones').insert(data).execute()
+        if not res.data:
+            raise Exception("No se pudo crear la sesión de caja.")
         caja_id = res.data[0]['id']
         
-        # Registrar movimiento inicial en cash_movements
+        # Registrar movimiento inicial en caja_movimientos
         mov_data = {
-            'session_id': caja_id,
-            'type': 'IN',
-            'amount': monto_inicial,
-            'method': 'CASH',
-            'reason': 'ADJUSTMENT',
-            'note': 'Apertura de Caja',
-            'created_by': usuario_id
+            'caja_sesion_id': caja_id,
+            'tipo': 'INGRESO',
+            'monto': monto_inicial,
+            'metodo_pago': 'EFECTIVO',
+            'descripcion': 'Apertura de Caja',
+            'usuario_id': usuario_id
         }
-        supabase.table('cash_movements').insert(mov_data).execute()
+        supabase.table('caja_movimientos').insert(mov_data).execute()
         return caja_id
 
     @staticmethod
@@ -63,12 +65,11 @@ class CajaManager:
             
         supabase = get_supabase()
         data = {
-            'closing_amount': monto_cierre,
-            'status': 'CLOSED',
-            'closed_at': datetime.now().isoformat(),
-            'closed_by': AuthManager.get_current_user().id if AuthManager.get_current_user() else None
+            'monto_cierre': monto_cierre,
+            'estado': 'CERRADA',
+            'fecha_cierre': datetime.now().isoformat()
         }
-        supabase.table('cash_register_sessions').update(data).eq('id', sesion['id']).execute()
+        supabase.table('caja_sesiones').update(data).eq('id', sesion['id']).execute()
         return True
 
     @staticmethod
@@ -91,25 +92,28 @@ class CajaManager:
         user = AuthManager.get_current_user()
         usuario_id = user.id if user else None
 
-        # Mapeo de método de pago
+        tipo_normalizado = 'INGRESO' if tipo.upper() in ['INGRESO', 'IN'] else 'EGRESO'
+
         metodos_pago_map = {
-            'EFECTIVO': 'CASH',
-            'TARJETA': 'CARD',
-            'TRANSFERENCIA': 'TRANSFER'
+            'CASH': 'EFECTIVO',
+            'EFECTIVO': 'EFECTIVO',
+            'CARD': 'TARJETA',
+            'TARJETA': 'TARJETA',
+            'TRANSFER': 'TRANSFERENCIA',
+            'TRANSFERENCIA': 'TRANSFERENCIA'
         }
-        db_method = metodos_pago_map.get(metodo_pago, 'CASH')
+        db_method = metodos_pago_map.get(metodo_pago.upper() if metodo_pago else '', 'EFECTIVO')
 
         supabase = get_supabase()
         data = {
-            'session_id': caja_sesion_id,
-            'type': 'IN' if tipo.upper() == 'INGRESO' else 'OUT',
-            'amount': monto,
-            'method': db_method,
-            'reason': 'OTHER',
-            'note': descripcion or '',
-            'created_by': usuario_id
+            'caja_sesion_id': caja_sesion_id,
+            'tipo': tipo_normalizado,
+            'monto': monto,
+            'metodo_pago': db_method,
+            'descripcion': descripcion or '',
+            'usuario_id': usuario_id
         }
-        supabase.table('cash_movements').insert(data).execute()
+        supabase.table('caja_movimientos').insert(data).execute()
         return True
 
     @staticmethod
@@ -131,51 +135,64 @@ class CajaManager:
         }
         
         # 1. Obtener monto inicial
-        sesion_res = supabase.table('cash_register_sessions').select('opening_amount').eq('id', caja_sesion_id).execute()
+        sesion_res = supabase.table('caja_sesiones').select('monto_inicial').eq('id', caja_sesion_id).execute()
         if sesion_res.data:
-            resumen['monto_inicial'] = float(sesion_res.data[0]['opening_amount'] or 0)
+            resumen['monto_inicial'] = float(sesion_res.data[0]['monto_inicial'] or 0)
             
-        # 2. Obtener ventas locales de la sesión en sales
+        # 2. Obtener ventas de la sesión
         try:
-            ventas_res = supabase.table('sales').select('id, payment_method, total').neq('status', 'CANCELLED').execute()
+            ventas_res = supabase.table('ventas').select('id, metodo_pago, total').eq('caja_sesion_id', caja_sesion_id).neq('estado', 'CANCELADA').execute()
             for v in ventas_res.data:
                 total_v = float(v['total'] or 0)
-                mp = v['payment_method']
-                if mp == 'CASH':
+                mp = v['metodo_pago'].upper()
+                if mp == 'EFECTIVO':
                     resumen['ventas_efectivo'] += total_v
-                elif mp in ['TRANSFER', 'CARD']:
+                elif mp in ['TRANSFERENCIA', 'TARJETA']:
                     resumen['ventas_transferencia'] += total_v
+                elif mp in ['CTA_CTE', 'CTA CTE', 'FIADO']:
+                    resumen['ventas_fiadas'] += total_v
                 else:
                     resumen['ventas_otros'] += total_v
-        except Exception:
+        except Exception as e:
+            print(f"Error en obtener_resumen ventas: {e}")
             pass
-                
-        resumen['total_vendido'] = resumen['ventas_efectivo'] + resumen['ventas_transferencia'] + resumen['ventas_fiadas'] + resumen['ventas_otros']
                 
         # 3. Obtener movimientos de caja
         try:
-            movs_res = supabase.table('cash_movements').select('type, method, amount, note').eq('session_id', caja_sesion_id).execute()
+            movs_res = supabase.table('caja_movimientos').select('tipo, metodo_pago, monto, descripcion').eq('caja_sesion_id', caja_sesion_id).execute()
             for m in movs_res.data:
-                monto_m = float(m['amount'] or 0)
-                tipo = m['type']
-                mp = m['method']
-                desc = m['note'] or ''
+                monto_m = float(m['monto'] or 0)
+                tipo = m['tipo']
+                mp = m['metodo_pago']
+                desc = m['descripcion'] or ''
                 
                 if desc == 'Apertura de Caja':
                     continue
                     
-                if tipo == 'IN' and mp == 'CASH':
-                    resumen['ingresos_manuales'] += monto_m
-                elif tipo == 'OUT' and mp == 'CASH':
-                    resumen['egresos_manuales'] += monto_m
-        except Exception:
+                if tipo == 'INGRESO':
+                    if "PAGO DE DEUDA" in desc.upper() or "PAGO DE CTAS CTES" in desc.upper() or "PAGO CTA CTE" in desc.upper():
+                        if mp == 'EFECTIVO':
+                            resumen['pagos_deuda_efectivo'] += monto_m
+                        else:
+                            resumen['pagos_deuda_transferencia'] += monto_m
+                    else:
+                        if mp == 'EFECTIVO':
+                            resumen['ingresos_manuales'] += monto_m
+                elif tipo == 'EGRESO':
+                    if mp == 'EFECTIVO':
+                        resumen['egresos_manuales'] += monto_m
+        except Exception as e:
+            print(f"Error en obtener_resumen movimientos: {e}")
             pass
+            
+        resumen['total_vendido'] = resumen['ventas_efectivo'] + resumen['ventas_transferencia'] + resumen['ventas_fiadas'] + resumen['ventas_otros']
                     
         # 4. Calcular total efectivo esperado
         resumen['total_efectivo_esperado'] = (
             resumen['monto_inicial'] + 
             resumen['ventas_efectivo'] + 
-            resumen['ingresos_manuales'] - 
+            resumen['ingresos_manuales'] +
+            resumen['pagos_deuda_efectivo'] - 
             resumen['egresos_manuales']
         )
         
@@ -185,17 +202,16 @@ class CajaManager:
     def obtener_movimientos(caja_sesion_id: int):
         supabase = get_supabase()
         try:
-            res = supabase.table('cash_movements').select('*').eq('session_id', caja_sesion_id).execute()
-            # Mapear para compatibilidad con UI
+            res = supabase.table('caja_movimientos').select('*').eq('caja_sesion_id', caja_sesion_id).execute()
             lista = []
             for item in res.data:
                 mov = item.copy()
-                mov['tipo'] = 'INGRESO' if item.get('type') == 'IN' else 'EGRESO'
-                mov['monto'] = item.get('amount')
-                mov['descripcion'] = item.get('note')
-                mov['metodo_pago'] = 'EFECTIVO' if item.get('method') == 'CASH' else 'TRANSFERENCIA'
+                mov['tipo'] = item.get('tipo')
+                mov['monto'] = float(item.get('monto') or 0.0)
+                mov['descripcion'] = item.get('descripcion')
+                mov['metodo_pago'] = item.get('metodo_pago')
                 lista.append(mov)
             return lista
-        except Exception:
+        except Exception as e:
+            print(f"Error en obtener_movimientos: {e}")
             return []
-
