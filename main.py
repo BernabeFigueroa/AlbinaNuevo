@@ -1,6 +1,15 @@
+import os
 import sys
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QFontDatabase, QFont
+from PyQt6.QtCore import Qt
+
+# Configurar soporte para pantallas High-DPI (escalado 125%, 150%, laptops)
+if hasattr(Qt.ApplicationAttribute, 'AA_EnableHighDpiScaling'):
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
+if hasattr(Qt.ApplicationAttribute, 'AA_UseHighDpiPixmaps'):
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
+
 from src.ui.login_window import LoginWindow
 
 def main():
