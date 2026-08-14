@@ -336,55 +336,72 @@ class ProductosView(QWidget):
             pass
 
     def cargar_grilla(self, filtro=""):
-        from src.core.cache_manager import DataCache
-        self.tabla.setRowCount(0)
-        incluir_inactivos = hasattr(self, 'chk_inactivos') and self.chk_inactivos.isChecked()
-        productos = DataCache.get_productos(incluir_inactivos=incluir_inactivos)
-        
-        cat_filtro = self.cb_filtro_categoria.currentData() if hasattr(self, 'cb_filtro_categoria') else None
-        prov_filtro = self.cb_filtro_proveedor.currentData() if hasattr(self, 'cb_filtro_proveedor') else None
+        try:
+            from src.core.cache_manager import DataCache
+            self.tabla.setUpdatesEnabled(False)
+            self.tabla.setRowCount(0)
+            incluir_inactivos = hasattr(self, 'chk_inactivos') and self.chk_inactivos.isChecked()
+            productos = DataCache.get_productos(incluir_inactivos=incluir_inactivos) or []
+            
+            cat_filtro = self.cb_filtro_categoria.currentData() if hasattr(self, 'cb_filtro_categoria') else None
+            prov_filtro = self.cb_filtro_proveedor.currentData() if hasattr(self, 'cb_filtro_proveedor') else None
 
-        for p in productos:
-            if cat_filtro and p['categoria_id'] != cat_filtro:
-                continue
-                
-            if prov_filtro and p['proveedor_id'] != prov_filtro:
-                continue
-                
-            if filtro:
-                filtro_lower = filtro.lower()
-                coincide = False
-                if filtro_lower in p['nombre'].lower():
-                    coincide = True
-                elif p['codigo_barras'] and filtro_lower in p['codigo_barras'].lower():
-                    coincide = True
-                elif p.get('talle') and filtro_lower in p['talle'].lower():
-                    coincide = True
-                elif filtro_lower == str(p['id']):
-                    coincide = True
-                if not coincide:
+            for p in productos:
+                if not isinstance(p, dict):
                     continue
-            
-            row_idx = self.tabla.rowCount()
-            self.tabla.insertRow(row_idx)
-            
-
-            # Mostrar ID interno como el código y centrarlo
-            codigo_mostrar = str(p['id'])
-            item_codigo = QTableWidgetItem(codigo_mostrar)
-            item_codigo.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            item_codigo.setData(Qt.ItemDataRole.UserRole, p['id']) # ID Oculto
-            self.tabla.setItem(row_idx, 0, item_codigo)
-            
-            item_nombre = QTableWidgetItem(p['nombre'])
-            if p.get('activo', 1) == 0:
-                item_nombre.setForeground(Qt.GlobalColor.red)
-                item_nombre.setText(f"{p['nombre']} (ELIMINADO)")
+                if cat_filtro and p.get('categoria_id') != cat_filtro:
+                    continue
+                    
+                if prov_filtro and p.get('proveedor_id') != prov_filtro:
+                    continue
+                    
+                if filtro:
+                    filtro_lower = filtro.lower()
+                    nombre_str = str(p.get('nombre') or '').lower()
+                    cb_str = str(p.get('codigo_barras') or '').lower()
+                    talle_str = str(p.get('talle') or '').lower()
+                    id_str = str(p.get('id') or '')
+                    
+                    if (filtro_lower not in nombre_str and 
+                        filtro_lower not in cb_str and 
+                        filtro_lower not in talle_str and 
+                        filtro_lower != id_str):
+                        continue
                 
-            self.tabla.setItem(row_idx, 1, item_nombre)
-            self.tabla.setItem(row_idx, 2, QTableWidgetItem(p.get('talle') or ""))
-            self.tabla.setItem(row_idx, 3, QTableWidgetItem(f"{p['precio_contado']:.2f}"))
-            self.tabla.setItem(row_idx, 4, QTableWidgetItem(str(p['stock_actual'])))
+                row_idx = self.tabla.rowCount()
+                self.tabla.insertRow(row_idx)
+                
+                # Mostrar ID interno como el código y centrarlo
+                prod_id = p.get('id', 0)
+                codigo_mostrar = str(prod_id)
+                item_codigo = QTableWidgetItem(codigo_mostrar)
+                item_codigo.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                item_codigo.setData(Qt.ItemDataRole.UserRole, prod_id) # ID Oculto
+                self.tabla.setItem(row_idx, 0, item_codigo)
+                
+                nombre_val = str(p.get('nombre') or 'Sin nombre')
+                item_nombre = QTableWidgetItem(nombre_val)
+                if p.get('activo', 1) == 0:
+                    item_nombre.setForeground(Qt.GlobalColor.red)
+                    item_nombre.setText(f"{nombre_val} (ELIMINADO)")
+                    
+                self.tabla.setItem(row_idx, 1, item_nombre)
+                self.tabla.setItem(row_idx, 2, QTableWidgetItem(str(p.get('talle') or "")))
+                
+                # Conversión segura de precio
+                try:
+                    precio = float(p.get('precio_contado') or 0.0)
+                except (ValueError, TypeError):
+                    precio = 0.0
+                self.tabla.setItem(row_idx, 3, QTableWidgetItem(f"{precio:.2f}"))
+                
+                # Conversión segura de stock
+                stock_val = p.get('stock_actual', 0)
+                self.tabla.setItem(row_idx, 4, QTableWidgetItem(str(stock_val if stock_val is not None else 0)))
+        except Exception as e:
+            print(f"Error cargando grilla de productos: {e}")
+        finally:
+            self.tabla.setUpdatesEnabled(True)
 
     def filtrar_grilla(self, texto):
         self.cargar_grilla(texto)

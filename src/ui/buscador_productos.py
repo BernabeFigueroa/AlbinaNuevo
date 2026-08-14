@@ -132,7 +132,11 @@ class BuscadorProductosDialog(QDialog):
             self.tabla.setItem(row_idx, 1, QTableWidgetItem(p['codigo_barras'] or ""))
             self.tabla.setItem(row_idx, 2, QTableWidgetItem(p['nombre']))
             self.tabla.setItem(row_idx, 3, QTableWidgetItem(p.get('talle') or ""))
-            self.tabla.setItem(row_idx, 4, QTableWidgetItem(f"${p['precio_contado']:.2f}"))
+            try:
+                precio_val = float(p.get('precio_contado') or 0.0)
+            except (ValueError, TypeError):
+                precio_val = 0.0
+            self.tabla.setItem(row_idx, 4, QTableWidgetItem(f"${precio_val:.2f}"))
             self.tabla.setItem(row_idx, 5, QTableWidgetItem(str(p['stock_actual'])))
 
         promociones = PromocionesManager.get_all()

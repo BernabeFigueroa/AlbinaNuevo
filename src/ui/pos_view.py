@@ -404,8 +404,11 @@ class POSView(QWidget):
             self.txt_codigo.clear()
             return
 
-        # Determinar el precio
-        precio_a_cobrar = float(producto['precio_contado'])
+        # Obtener precio según medio de pago
+        try:
+            precio_a_cobrar = float(producto.get('precio_contado') or 0.0)
+        except (ValueError, TypeError):
+            precio_a_cobrar = 0.0
         
         # Verificar si ya está en el carrito para sumar cantidad (y chequear que sea el mismo precio)
         encontrado = False
