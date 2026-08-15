@@ -23,26 +23,46 @@ class ProductosManager:
             query = query.eq('activo', True)
         res = query.execute()
         
-        # Reformatear para que la UI reciba diccionarios planos
+        # Reformatear para que la UI reciba diccionarios planos con compatibilidad total de campos
         productos = []
         for p in res.data:
             prod = p.copy()
+            # Mapear precio general a precio_contado / precio_tarjeta si no existen explícitos
+            val_precio = float(p.get('precio') if p.get('precio') is not None else p.get('precio_contado') or 0.0)
+            prod['precio_contado'] = float(p.get('precio_contado') if p.get('precio_contado') is not None else val_precio)
+            prod['precio_tarjeta'] = float(p.get('precio_tarjeta') if p.get('precio_tarjeta') is not None else val_precio)
+            
+            # Mapear stock a stock_actual
+            val_stock = int(p.get('stock') if p.get('stock') is not None else p.get('stock_actual') or 0)
+            prod['stock_actual'] = val_stock
+            
             prod['categoria_nombre'] = p['categorias']['nombre'] if p.get('categorias') else None
             prod['proveedor_nombre'] = p['proveedores']['nombre'] if p.get('proveedores') else None
             productos.append(prod)
         return productos
 
     @staticmethod
+    def _normalizar_producto(prod: dict):
+        if not prod: return prod
+        p = prod.copy()
+        val_precio = float(p.get('precio') if p.get('precio') is not None else p.get('precio_contado') or 0.0)
+        p['precio_contado'] = float(p.get('precio_contado') if p.get('precio_contado') is not None else val_precio)
+        p['precio_tarjeta'] = float(p.get('precio_tarjeta') if p.get('precio_tarjeta') is not None else val_precio)
+        val_stock = int(p.get('stock') if p.get('stock') is not None else p.get('stock_actual') or 0)
+        p['stock_actual'] = val_stock
+        return p
+
+    @staticmethod
     def get_by_codigo(codigo: str):
         supabase = get_supabase()
         res = supabase.table('productos').select('*').eq('codigo_barras', codigo).eq('activo', True).execute()
         if res.data:
-            return res.data[0]
+            return ProductosManager._normalizar_producto(res.data[0])
             
         if codigo.isdigit():
             res = supabase.table('productos').select('*').eq('id', int(codigo)).eq('activo', True).execute()
             if res.data:
-                return res.data[0]
+                return ProductosManager._normalizar_producto(res.data[0])
         return None
 
     @staticmethod
@@ -50,10 +70,10 @@ class ProductosManager:
         supabase = get_supabase()
         try:
             res = supabase.table('productos').select('*, creado_ref:usuarios!creado_por(nombre, username), modificado_ref:usuarios!modificado_por(nombre, username)').eq('id', producto_id).execute()
-            return res.data[0] if res.data else None
+            return ProductosManager._normalizar_producto(res.data[0]) if res.data else None
         except Exception:
             res = supabase.table('productos').select('*').eq('id', producto_id).execute()
-            return res.data[0] if res.data else None
+            return ProductosManager._normalizar_producto(res.data[0]) if res.data else None
 
     @staticmethod
     def calcular_precios(costo_lista: float, flete: float, utilidad_porcentaje: float):
