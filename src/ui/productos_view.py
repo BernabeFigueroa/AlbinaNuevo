@@ -180,8 +180,17 @@ class ProductosView(QWidget):
         self.txt_ubicacion.setVisible(False)
         self.lbl_creado_por = QLabel("-")
         self.lbl_creado_por.setVisible(False)
+        
+        from src.core.auth_manager import AuthManager
         self.lbl_modificado_por = QLabel("-")
-        self.lbl_modificado_por.setVisible(False)
+        if AuthManager.is_admin():
+            lbl_mod = QLabel("Modificado por:")
+            lbl_mod.setStyleSheet("color: #7A7067; font-size: 11px;")
+            self.lbl_modificado_por.setStyleSheet("color: #7A7067; font-size: 11px; font-weight: bold;")
+            g_layout.addWidget(lbl_mod, 4, 4, Qt.AlignmentFlag.AlignRight)
+            g_layout.addWidget(self.lbl_modificado_por, 4, 5)
+        else:
+            self.lbl_modificado_por.setVisible(False)
 
         form_layout.addWidget(g_frame)
 
