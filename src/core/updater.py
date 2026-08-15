@@ -4,10 +4,10 @@ import json
 import urllib.request
 import subprocess
 from packaging import version
-from PyQt6.QtCore import QThread, pyqtSignal, Qt
+from PyQt6.QtCore import QThread, pyqtSignal, Qt, QFont
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout, QMessageBox, QApplication
 
-CURRENT_VERSION = "1.1.0"
+CURRENT_VERSION = "1.1.1"
 GITHUB_REPO = "BernabeFigueroa/AlbinaNuevo"  # Repositorio oficial para releases/binarios
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
@@ -36,7 +36,7 @@ class UpdateCheckerThread(QThread):
                         download_url = None
                         exe_size = 0
                         
-                        # Determinar el nombre exacto del ejecutable en ejecución (ej: AlbinaPOS_Italia.exe o AlbinaAccesorios.exe)
+                        # Determinar el nombre exacto del ejecutable en ejecución
                         current_exe_name = os.path.basename(sys.executable).lower() if getattr(sys, 'frozen', False) else "albinapos_sanmartin.exe"
                         
                         assets = data.get("assets", [])
@@ -90,19 +90,24 @@ class DownloadWorkerThread(QThread):
                 self.download_url,
                 headers={"User-Agent": "AlbinaPOS-AutoUpdater"}
             )
-            with urllib.request.urlopen(req, timeout=45) as response:
-                total_size = int(response.headers.get('content-length', 0))
+            with urllib.request.urlopen(req, timeout=30) as response:
+                total_size = response.headers.get('content-length')
+                if total_size:
+                    total_size = int(total_size)
+                else:
+                    total_size = None
+
                 bytes_downloaded = 0
-                block_size = 65536  # 64KB
+                block_size = 65536  # 64 KB por bloque para máxima velocidad
 
                 with open(self.target_path, 'wb') as f:
                     while True:
                         buffer = response.read(block_size)
                         if not buffer:
                             break
-                        bytes_downloaded += len(buffer)
                         f.write(buffer)
-                        if total_size > 0:
+                        bytes_downloaded += len(buffer)
+                        if total_size and total_size > 0:
                             percent = int((bytes_downloaded / total_size) * 100)
                             self.progress.emit(percent)
 
@@ -116,55 +121,86 @@ class UpdateDialog(QDialog):
         super().__init__(parent)
         self.release_info = release_info
         self.setWindowTitle("Actualización Disponible - Albina Accesorios")
-        self.setFixedSize(480, 250)
+        self.setFixedSize(480, 260)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
         self.setup_ui()
 
     def setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(22, 20, 22, 20)
-        layout.setSpacing(14)
-
-        title = QLabel(f"<b>¡Nueva versión disponible: v{self.release_info['version']}!</b>")
-        title.setStyleSheet("font-size: 15px; color: #2C2520;")
-        layout.addWidget(title)
-
-        body_text = self.release_info.get('body', '').strip()
-        if not body_text:
-            body_text = "Se han incluido mejoras de rendimiento y estabilidad."
-            
-        desc = QLabel(f"Versión actual: v{CURRENT_VERSION}\n\nNovedades:\n{body_text}")
-        desc.setWordWrap(True)
-        desc.setStyleSheet("color: #60564D; font-size: 12px;")
-        layout.addWidget(desc)
-
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setValue(0)
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setTextVisible(True)
-        self.progress_bar.setStyleSheet("""
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #FAF8F5;
+            }
+            QLabel {
+                color: #2C2520;
+            }
+            QPushButton {
+                background-color: #B09886;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 8px;
+                font-weight: bold;
+                font-size: 13px;
+                padding: 8px 16px;
+                min-height: 32px;
+            }
+            QPushButton:hover {
+                background-color: #9C8573;
+            }
+            QPushButton#btn_cancel {
+                background-color: #ACA096;
+            }
+            QPushButton#btn_cancel:hover {
+                background-color: #918A83;
+            }
             QProgressBar {
                 border: 1px solid #E5DFD5;
                 border-radius: 6px;
+                background-color: #FFFFFF;
                 text-align: center;
-                height: 22px;
-                background-color: #FAF8F5;
+                color: #2C2520;
                 font-weight: bold;
+                height: 22px;
             }
             QProgressBar::chunk {
                 background-color: #B09886;
                 border-radius: 5px;
             }
         """)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(14)
+
+        lbl_title = QLabel(f"¡Nueva versión disponible: v{self.release_info['version']}!")
+        lbl_title.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        lbl_title.setStyleSheet("color: #2C2520;")
+        layout.addWidget(lbl_title)
+
+        lbl_desc = QLabel(
+            f"Se ha publicado una actualización para Albina Accesorios San Martín.\n"
+            f"Versión actual: v{CURRENT_VERSION} -> Nueva: v{self.release_info['version']}\n\n"
+            f"Haga clic en 'Actualizar e Instalar' para descargar e iniciar la versión más reciente."
+        )
+        lbl_desc.setWordWrap(True)
+        lbl_desc.setStyleSheet("color: #7A7067; font-size: 12px;")
+        layout.addWidget(lbl_desc)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(False)
         layout.addWidget(self.progress_bar)
 
         self.lbl_status = QLabel("")
-        self.lbl_status.setStyleSheet("font-size: 11px; color: #8C7869;")
+        self.lbl_status.setStyleSheet("color: #7A7067; font-size: 11px; font-style: italic;")
         self.lbl_status.setVisible(False)
         layout.addWidget(self.lbl_status)
 
+        layout.addStretch()
+
         btn_layout = QHBoxLayout()
-        self.btn_cancel = QPushButton("Más tarde")
-        self.btn_cancel.setObjectName("btn_neutral")
+        self.btn_cancel = QPushButton("Omitir por ahora")
+        self.btn_cancel.setObjectName("btn_cancel")
         self.btn_cancel.clicked.connect(self.reject)
 
         self.btn_update = QPushButton("Actualizar e Instalar")
@@ -183,7 +219,6 @@ class UpdateDialog(QDialog):
         self.lbl_status.setText("Descargando actualización desde GitHub...")
 
         import tempfile
-        # Usar directorio temporal del usuario con permisos de escritura garantizados
         temp_dir = tempfile.gettempdir()
         new_exe_path = os.path.join(temp_dir, "AlbinaPOS_SanMartin_update.exe")
 
@@ -207,8 +242,8 @@ class UpdateDialog(QDialog):
 
 def apply_update_and_restart(new_exe_path):
     """
-    Ejecuta el reemplazo atómico del ejecutable y vuelve a iniciar la app.
-    Maneja procesos en ejecución y permisos en carpetas del sistema.
+    Ejecuta el reemplazo seguro del ejecutable y vuelve a iniciar la app.
+    Maneja procesos en ejecución y permisos.
     """
     if not getattr(sys, 'frozen', False):
         QMessageBox.information(None, "Modo Desarrollo", f"Descargado con éxito en:\n{new_exe_path}\n(En modo ejecutable se aplica el reemplazo automático y reinicio)")
@@ -218,55 +253,56 @@ def apply_update_and_restart(new_exe_path):
     current_exe = sys.executable
     pid = os.getpid()
     temp_dir = tempfile.gettempdir()
-    updater_ps1 = os.path.join(temp_dir, "update_albina.ps1")
-    updater_vbs = os.path.join(temp_dir, "launch_update.vbs")
+    updater_bat = os.path.join(temp_dir, "update_albina.bat")
 
-    # Script en PowerShell que espera el cierre del PID, reemplaza el binario y lo vuelve a lanzar
-    ps_content = f"""
-$currentExe = "{current_exe}"
-$newExe = "{new_exe_path}"
-$pidToWait = {pid}
+    # Script Batch infalible compatible con todas las versiones de Windows y permisos
+    bat_content = f"""@echo off
+title Actualizando Albina POS...
+echo ======================================================
+echo           ACTUALIZANDO ALBINA POS SAN MARTIN          
+echo ======================================================
+echo Por favor espere mientras se instala la nueva version...
 
-# 1. Esperar a que el proceso principal termine
-try {{
-    $proc = Get-Process -Id $pidToWait -ErrorAction SilentlyContinue
-    if ($proc) {{
-        $proc.WaitForExit(8000)
-    }}
-}} catch {{}}
+:: 1. Esperar a que el proceso anterior se cierre
+timeout /t 2 /nobreak >nul
+taskkill /F /PID {pid} >nul 2>&1
 
-Start-Sleep -Seconds 1
+:: 2. Intentar reemplazar el archivo ejecutable
+set ATTEMPTS=0
+:RETRY
+set /a ATTEMPTS+=1
+copy /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
+if %ERRORLEVEL% equ 0 goto SUCCESS
 
-# 2. Intentar reemplazar el archivo hasta 10 veces
-$replaced = $false
-for ($i = 0; $i -lt 10; $i++) {{
-    try {{
-        Copy-Item -Path $newExe -Destination $currentExe -Force -ErrorAction Stop
-        $replaced = $true
-        break
-    }} catch {{
-        Start-Sleep -Seconds 1
-    }}
-}}
+if %ATTEMPTS% lss 15 (
+    timeout /t 1 /nobreak >nul
+    goto RETRY
+)
 
-# 3. Si se reemplazó, borrar temporal e iniciar la nueva versión
-if (Test-Path $newExe) {{
-    Remove-Item -Path $newExe -Force -ErrorAction SilentlyContinue
-}}
+echo No se pudo sobrescribir directamente. Intentando con permisos...
+del /F /Q "{current_exe}" >nul 2>&1
+copy /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
 
-Start-Process -FilePath $currentExe
+:SUCCESS
+del /F /Q "{new_exe_path}" >nul 2>&1
+
+echo Iniciando nueva version...
+start "" "{current_exe}"
+
+:: Limpiar el propio script batch
+(goto) 2>nul & del "%~f0"
+exit
 """
 
-    # VBScript para ejecutar PowerShell de forma completamente invisible y sin ventana negra
-    vbs_content = 'Set WshShell = CreateObject("WScript.Shell")\n' + f'WshShell.Run "powershell.exe -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File ""{updater_ps1}""", 0, False\n'
-
     try:
-        with open(updater_ps1, "w", encoding="utf-8") as f:
-            f.write(ps_content)
-        with open(updater_vbs, "w", encoding="utf-8") as f:
-            f.write(vbs_content)
+        with open(updater_bat, "w", encoding="utf-8") as f:
+            f.write(bat_content)
 
-        subprocess.Popen(["wscript.exe", updater_vbs])
+        # Lanzar el proceso batch independiente
+        subprocess.Popen(
+            ["cmd.exe", "/c", updater_bat],
+            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS if hasattr(subprocess, 'DETACHED_PROCESS') else 0
+        )
     except Exception as e:
         print(f"Error lanzando updater: {e}")
 
