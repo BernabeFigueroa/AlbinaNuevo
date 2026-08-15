@@ -173,6 +173,21 @@ class ProductosView(QWidget):
         min_max_layout.addWidget(self.txt_stock_max)
         g_layout.addLayout(min_max_layout, 3, 5)
 
+        # Fila 4: Trazabilidad (Solo visible para Administradores)
+        from src.core.auth_manager import AuthManager
+        self.lbl_trazabilidad_titulo = QLabel("Modificado por:")
+        self.lbl_trazabilidad_titulo.setStyleSheet("font-weight: bold; color: #7A7067; font-size: 12px;")
+        
+        self.lbl_modificado_por = QLabel("Sin modificaciones registradas")
+        self.lbl_modificado_por.setStyleSheet("color: #2C2520; font-size: 12px; font-weight: 600; font-style: italic;")
+        
+        es_admin = AuthManager.is_admin()
+        self.lbl_trazabilidad_titulo.setVisible(es_admin)
+        self.lbl_modificado_por.setVisible(es_admin)
+
+        g_layout.addWidget(self.lbl_trazabilidad_titulo, 4, 0)
+        g_layout.addWidget(self.lbl_modificado_por, 4, 1, 1, 5)
+
         # Ocultos
         self.txt_precio_tarjeta = NumericLineEdit("0.00")
         self.txt_precio_tarjeta.setVisible(False)
@@ -180,8 +195,6 @@ class ProductosView(QWidget):
         self.txt_ubicacion.setVisible(False)
         self.lbl_creado_por = QLabel("-")
         self.lbl_creado_por.setVisible(False)
-        self.lbl_modificado_por = QLabel("-")
-        self.lbl_modificado_por.setVisible(False)
 
         form_layout.addWidget(g_frame)
 
@@ -442,13 +455,19 @@ class ProductosView(QWidget):
         self.txt_ubicacion.setText(producto.get('ubicacion') or "")
         self.txt_talle.setText(producto.get('talle') or "")
         
+        # Información de trazabilidad
         creado = "Desconocido"
         if producto.get('creado_ref'):
             creado = producto['creado_ref'].get('nombre') or producto['creado_ref'].get('username') or "Desconocido"
             
-        modificado = "Desconocido"
-        if producto.get('modificado_ref'):
-            modificado = producto['modificado_ref'].get('nombre') or producto['modificado_ref'].get('username') or "Desconocido"
+        modificado = producto.get('modificado_por_nombre') or producto.get('modificado_por_username')
+        if not modificado and producto.get('modificado_ref'):
+            modificado = producto['modificado_ref'].get('nombre') or producto['modificado_ref'].get('username')
+            
+        if not modificado:
+            # Si no hay modificación específica, mostrar fecha de creación
+            fecha_creacion = str(producto.get('created_at') or '')[:10]
+            modificado = f"Registro inicial ({fecha_creacion})" if fecha_creacion else "Sin modificaciones registradas"
             
         self.lbl_creado_por.setText(creado)
         self.lbl_modificado_por.setText(modificado)

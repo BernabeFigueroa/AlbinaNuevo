@@ -7,7 +7,7 @@ from packaging import version
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout, QMessageBox, QApplication
 
-CURRENT_VERSION = "1.0.4"
+CURRENT_VERSION = "1.0.5"
 GITHUB_REPO = "BernabeFigueroa/albina-pos-releases"  # Repositorio público exclusivo para releases/binarios
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
@@ -35,11 +35,26 @@ class UpdateCheckerThread(QThread):
                     if version.parse(tag_name) > version.parse(CURRENT_VERSION):
                         download_url = None
                         exe_size = 0
-                        for asset in data.get("assets", []):
-                            if asset.get("name", "").endswith(".exe"):
+                        
+                        # Determinar el nombre exacto del ejecutable en ejecución (ej: AlbinaPOS_Italia.exe o AlbinaAccesorios.exe)
+                        current_exe_name = os.path.basename(sys.executable).lower() if getattr(sys, 'frozen', False) else "albinaaccesorios.exe"
+                        
+                        assets = data.get("assets", [])
+                        # 1. Buscar coincidencia exacta por nombre
+                        for asset in assets:
+                            asset_name = asset.get("name", "").lower()
+                            if asset_name == current_exe_name:
                                 download_url = asset.get("browser_download_url")
                                 exe_size = asset.get("size", 0)
                                 break
+                        
+                        # 2. Si no hay coincidencia exacta pero solo hay 1 ejecutable genérico en el repo
+                        if not download_url:
+                            for asset in assets:
+                                if asset.get("name", "").lower().endswith(".exe"):
+                                    download_url = asset.get("browser_download_url")
+                                    exe_size = asset.get("size", 0)
+                                    break
                         
                         if download_url:
                             self.update_available.emit({
@@ -167,9 +182,10 @@ class UpdateDialog(QDialog):
         self.lbl_status.setVisible(True)
         self.lbl_status.setText("Descargando actualización desde GitHub...")
 
-        current_exe = sys.executable if getattr(sys, 'frozen', False) else os.path.abspath("AlbinaAccesorios.exe")
-        target_dir = os.path.dirname(current_exe)
-        new_exe_path = os.path.join(target_dir, "AlbinaAccesorios_new.exe")
+        import tempfile
+        # Usar directorio temporal del usuario con permisos de escritura garantizados
+        temp_dir = tempfile.gettempdir()
+        new_exe_path = os.path.join(temp_dir, "AlbinaAccesorios_update.exe")
 
         self.worker = DownloadWorkerThread(self.release_info["download_url"], new_exe_path)
         self.worker.progress.connect(self.progress_bar.setValue)
@@ -178,7 +194,7 @@ class UpdateDialog(QDialog):
         self.worker.start()
 
     def on_download_finished(self, new_exe_path):
-        self.lbl_status.setText("Descarga finalizada. Reiniciando aplicación...")
+        self.lbl_status.setText("Descarga finalizada. Aplicando actualización...")
         apply_update_and_restart(new_exe_path)
         self.accept()
 
@@ -191,15 +207,17 @@ class UpdateDialog(QDialog):
 
 def apply_update_and_restart(new_exe_path):
     """
-    Crea un batch script que espera que cierre la app actual,
-    reemplaza el .exe viejo por el nuevo y vuelve a abrirlo.
+    Crea un batch script en TEMP que espera que cierre la app actual,
+    reemplaza el .exe viejo por el nuevo (manejando permisos) y vuelve a abrirlo.
     """
     if not getattr(sys, 'frozen', False):
         QMessageBox.information(None, "Modo Desarrollo", f"Descargado con éxito en:\n{new_exe_path}\n(En modo ejecutable se aplica el reemplazo automático y reinicio)")
         return
 
+    import tempfile
     current_exe = sys.executable
-    updater_bat = os.path.join(os.path.dirname(current_exe), "update_albina.bat")
+    temp_dir = tempfile.gettempdir()
+    updater_bat = os.path.join(temp_dir, "update_albina.bat")
 
     bat_content = f"""@echo off
 chcp 65001 > nul
@@ -210,15 +228,22 @@ if exist "{current_exe}" (
     timeout /t 1 /nobreak > nul
     goto retry
 )
-move /y "{new_exe_path}" "{current_exe}" > nul
+copy /y "{new_exe_path}" "{current_exe}" > nul 2>&1
+if not exist "{current_exe}" (
+    move /y "{new_exe_path}" "{current_exe}" > nul 2>&1
+)
+del "{new_exe_path}" > nul 2>&1
 start "" "{current_exe}"
 del "%~f0" > nul 2>&1
 exit
 """
 
-    with open(updater_bat, "w", encoding="utf-8") as f:
-        f.write(bat_content)
+    try:
+        with open(updater_bat, "w", encoding="utf-8") as f:
+            f.write(bat_content)
+        subprocess.Popen(["cmd.exe", "/c", updater_bat], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+    except Exception as e:
+        print(f"Error lanzando updater batch: {e}")
 
-    subprocess.Popen(["cmd.exe", "/c", updater_bat], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
     QApplication.quit()
     sys.exit(0)
