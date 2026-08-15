@@ -10,6 +10,17 @@ class LoginWindow(QWidget):
         self.setWindowTitle("Albina Accesorios - Ingreso")
         self.resize(400, 500)
         self.setup_ui()
+        self.check_for_updates()
+
+    def check_for_updates(self):
+        from src.core.updater import UpdateCheckerThread, UpdateDialog
+        self.updater_thread = UpdateCheckerThread()
+        def on_update_found(release_info):
+            dialog = UpdateDialog(release_info, self)
+            dialog.exec()
+        self.updater_thread.update_available.connect(on_update_found)
+        self.updater_thread.start()
+
     def setup_ui(self):
         self.setObjectName("LoginWindow")
         self.setStyleSheet("#LoginWindow { background-color: #FAF8F5; }")

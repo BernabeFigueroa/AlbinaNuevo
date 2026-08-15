@@ -52,8 +52,9 @@ class MainWindow(QMainWindow):
         logo_path = os.path.join(base_path, "logo-albina.png")
         pixmap = QPixmap(logo_path)
         if not pixmap.isNull():
-            lbl_brand.setPixmap(pixmap.scaledToWidth(200, Qt.TransformationMode.SmoothTransformation))
+            lbl_brand.setPixmap(pixmap.scaled(200, 100, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
             lbl_brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl_brand.setMinimumHeight(100)
 
             lbl_brand.setStyleSheet("margin-bottom: 20px; border: none; background-color: transparent;")
         else:

@@ -47,20 +47,22 @@ class POSView(QWidget):
 
     def init_ui(self):
         layout_principal = QVBoxLayout()
-        layout_principal.setContentsMargins(20, 20, 20, 20)
-        layout_principal.setSpacing(15)
+        layout_principal.setContentsMargins(12, 10, 12, 10)
+        layout_principal.setSpacing(8)
         self.setLayout(layout_principal)
 
-        # --- 1. CABECERA: FACTURACIÓN Y CLIENTE ---
+        # --- 1. CABECERA: FACTURACIÓN Y CLIENTE (Compacta) ---
         header_frame = self.crear_seccion_frame()
         header_layout = QGridLayout(header_frame)
-        header_layout.setContentsMargins(15, 15, 15, 15)
-        header_layout.setVerticalSpacing(10)
+        header_layout.setContentsMargins(12, 8, 12, 8)
+        header_layout.setVerticalSpacing(6)
+        header_layout.setHorizontalSpacing(8)
 
-        # Fila 0: Info Comprobante y Fecha
-        header_layout.addWidget(QLabel("FACTURACIÓN - VENTA"), 0, 0, 1, 2)
+        # Fila 0: Título y Botón Alternar Menú
+        lbl_header = QLabel("FACTURACIÓN - VENTA")
+        lbl_header.setStyleSheet("font-size: 13px; font-weight: bold; color: #2C2520;")
+        header_layout.addWidget(lbl_header, 0, 0, 1, 2)
         
-        # Botón de engranaje para alternar menú
         from PyQt6.QtGui import QIcon
         from PyQt6.QtCore import QSize
         import os, sys
@@ -72,14 +74,14 @@ class POSView(QWidget):
         icon_path = os.path.join(base_path, "assets", "icons", "settings.svg")
         self.btn_toggle_menu = QPushButton()
         self.btn_toggle_menu.setIcon(QIcon(icon_path))
-        self.btn_toggle_menu.setIconSize(QSize(24, 24))
-        self.btn_toggle_menu.setFixedSize(40, 40)
+        self.btn_toggle_menu.setIconSize(QSize(20, 20))
+        self.btn_toggle_menu.setFixedSize(32, 32)
         self.btn_toggle_menu.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_toggle_menu.setStyleSheet("""
             QPushButton {
                 background-color: #F4EFE6;
                 border: 1px solid #E5DFD5;
-                border-radius: 8px;
+                border-radius: 6px;
             }
             QPushButton:hover {
                 background-color: #E5DFD5;
@@ -88,41 +90,35 @@ class POSView(QWidget):
         self.btn_toggle_menu.clicked.connect(lambda: self.toggle_sidebar.emit())
         header_layout.addWidget(self.btn_toggle_menu, 0, 6, Qt.AlignmentFlag.AlignRight)
 
-        
-        # Panel derecho del comprobante (Factura B, etc)
-        comprobante_frame = QFrame()
-        comprobante_layout = QHBoxLayout(comprobante_frame)
-        comprobante_layout.setContentsMargins(0, 0, 0, 0)
-        
-        cb_tipo_factura = QComboBox()
-        cb_tipo_factura.addItems(["Factura B", "Factura A", "Ticket C"])
-        cb_tipo_factura.setFixedWidth(100)
-        
-        lbl_nro_factura = QLabel("Nº 00000001")
-        lbl_nro_factura.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
-        lbl_nro_factura.setStyleSheet("color: #000000;")
-        
-        comprobante_layout.addWidget(cb_tipo_factura)
-        comprobante_layout.addWidget(lbl_nro_factura)
-        comprobante_layout.addStretch()
-        
-        comprobante_frame.setVisible(False)
-        header_layout.addWidget(comprobante_frame, 0, 4, 1, 2, Qt.AlignmentFlag.AlignRight)
-
-        # Fila 1: Cliente
-        header_layout.addWidget(QLabel("Código Cliente:"), 1, 0)
+        # Fila 1: Cliente y Nombre
+        header_layout.addWidget(QLabel("Cliente:"), 1, 0)
         
         cliente_input_layout = QHBoxLayout()
         cliente_input_layout.setContentsMargins(0, 0, 0, 0)
-        cliente_input_layout.setSpacing(5)
+        cliente_input_layout.setSpacing(4)
         self.txt_cod_cliente = QLineEdit("1")
-        self.txt_cod_cliente.setFixedWidth(80)
+        self.txt_cod_cliente.setFixedWidth(55)
+        self.txt_cod_cliente.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.txt_cod_cliente.returnPressed.connect(self.buscar_cliente)
         cliente_input_layout.addWidget(self.txt_cod_cliente)
         
         self.btn_buscar_cliente = QPushButton("Buscar (F3)")
-        self.btn_buscar_cliente.setObjectName("btn_primary")
-
+        self.btn_buscar_cliente.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_buscar_cliente.setStyleSheet("""
+            QPushButton {
+                background-color: #B09886;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 6px;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 4px 8px;
+                min-height: 24px;
+            }
+            QPushButton:hover {
+                background-color: #9C8573;
+            }
+        """)
         self.btn_buscar_cliente.clicked.connect(self.abrir_buscador_clientes_f3)
         cliente_input_layout.addWidget(self.btn_buscar_cliente)
         
@@ -131,127 +127,145 @@ class POSView(QWidget):
         header_layout.addWidget(QLabel("Nombre:"), 1, 2)
         self.txt_nombre_cliente = QLineEdit("CONSUMIDOR FINAL")
         self.txt_nombre_cliente.setReadOnly(True)
-        header_layout.addWidget(self.txt_nombre_cliente, 1, 3, 1, 3)
+        header_layout.addWidget(self.txt_nombre_cliente, 1, 3)
 
-        # Fila 2: Domicilio, Localidad, Condición
-        header_layout.addWidget(QLabel("Domicilio:"), 2, 0)
-        self.txt_domicilio = QLineEdit("")
-        self.txt_domicilio.setReadOnly(True)
-        header_layout.addWidget(self.txt_domicilio, 2, 1, 1, 2)
-
-        header_layout.addWidget(QLabel("Cond. IVA:"), 2, 3)
+        header_layout.addWidget(QLabel("Cond. IVA:"), 1, 4)
         self.txt_cond_iva = QLineEdit("Consumidor Final")
         self.txt_cond_iva.setReadOnly(True)
-        header_layout.addWidget(self.txt_cond_iva, 2, 4)
+        header_layout.addWidget(self.txt_cond_iva, 1, 5)
 
-        header_layout.addWidget(QLabel("CUIT/DNI:"), 2, 5)
+        header_layout.addWidget(QLabel("DNI/CUIT:"), 1, 6)
         self.txt_cuit = QLineEdit("00000000000")
         self.txt_cuit.setReadOnly(True)
-        header_layout.addWidget(self.txt_cuit, 2, 6)
+        self.txt_cuit.setFixedWidth(110)
+        header_layout.addWidget(self.txt_cuit, 1, 7)
 
-        layout_principal.addWidget(header_frame)
+        self.txt_domicilio = QLineEdit("")
+        self.txt_domicilio.setVisible(False)
 
-        # --- 2. INPUT DE PRODUCTO Y TIPO DE CONSUMO ---
-        input_layout = QVBoxLayout()
-        
+        layout_principal.addWidget(header_frame, 0)
+
         # --- 2. INPUT DE PRODUCTO ---
-        input_layout = QVBoxLayout()
-        
-        # Buscador
         search_bar_layout = QHBoxLayout()
         self.txt_codigo = QLineEdit()
-        self.txt_codigo
-        self.txt_codigo.setFont(QFont("Segoe UI", 16))
-        self.txt_codigo.setPlaceholderText("Ingrese Código de Barras o Artículo y presione Enter (F2 para buscar)...")
-        self.txt_codigo.setMinimumHeight(50)
+        self.txt_codigo.setFont(QFont("Segoe UI", 14))
+        self.txt_codigo.setPlaceholderText("Código de barras o artículo y Enter (F2 para buscar)...")
+        self.txt_codigo.setMinimumHeight(40)
         self.txt_codigo.returnPressed.connect(self.buscar_y_agregar_producto)
         search_bar_layout.addWidget(self.txt_codigo)
-        
-        input_layout.addLayout(search_bar_layout)
-        layout_principal.addLayout(input_layout)
+        layout_principal.addLayout(search_bar_layout, 0)
 
-        # --- 3. GRILLA DE PRODUCTOS ---
+        # --- 3. GRILLA DE PRODUCTOS (EXPANDIBLE) ---
         self.tabla_carrito = QTableWidget(0, 6)
         self.tabla_carrito.setHorizontalHeaderLabels(["Código", "Descripción", "Talle", "Cantidad", "P. Unitario", "Importe"])
         self.tabla_carrito.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.tabla_carrito.setFont(QFont("Segoe UI", 12))
+        self.tabla_carrito.setFont(QFont("Segoe UI", 11))
         self.tabla_carrito.verticalHeader().setVisible(False)
-        self.tabla_carrito.verticalHeader().setDefaultSectionSize(40)
+        self.tabla_carrito.verticalHeader().setDefaultSectionSize(34)
         self.tabla_carrito.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla_carrito.itemChanged.connect(self.al_cambiar_celda)
-        layout_principal.addWidget(self.tabla_carrito)
+        self.tabla_carrito.setMinimumHeight(200)
+        layout_principal.addWidget(self.tabla_carrito, 1)
 
-        # Panel inferior responsivo
+        # --- 4. PANEL INFERIOR RESPONSIVO (TOTALES Y ACCIONES) ---
         bottom_frame = self.crear_seccion_frame()
         bottom_layout = QHBoxLayout(bottom_frame)
-        bottom_layout.setContentsMargins(10, 10, 10, 10)
-        bottom_layout.setSpacing(10)
+        bottom_layout.setContentsMargins(15, 8, 15, 8)
+        bottom_layout.setSpacing(15)
 
-        # Vendedor e Info adicional
+        # Info y atajos
         info_layout = QVBoxLayout()
         info_layout.setSpacing(2)
-        info_layout.addWidget(QLabel("Vendedor: 01 - Principal"))
-        lbl_shortcuts = QLabel("[F5] Cobrar   |   [F12] Cancelar Venta   |   [Supr] Eliminar Fila")
-        lbl_shortcuts.setStyleSheet("color: #666666; font-size: 11px;")
+        lbl_vend = QLabel("Vendedor: 01 - Principal")
+        lbl_vend.setStyleSheet("font-weight: bold; color: #2C2520; font-size: 12px;")
+        info_layout.addWidget(lbl_vend)
+        lbl_shortcuts = QLabel("[F5] Cobrar | [F12] Cancelar | [Supr] Borrar")
+        lbl_shortcuts.setStyleSheet("color: #7A7067; font-size: 11px;")
         info_layout.addWidget(lbl_shortcuts)
-        bottom_layout.addLayout(info_layout, 2)
+        bottom_layout.addLayout(info_layout)
 
         # Botones de Acción
+        btn_action_layout = QHBoxLayout()
+        btn_action_layout.setSpacing(8)
+
         self.btn_cobrar = QPushButton("COBRAR (F5)")
-        self.btn_cobrar.setObjectName("btn_primary")
-        self.btn_cobrar.setMinimumSize(120, 50)
+        self.btn_cobrar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_cobrar.setFixedHeight(44)
+        self.btn_cobrar.setMinimumWidth(125)
         self.btn_cobrar.setStyleSheet("""
-            QPushButton { background-color: #B09886; color: #FFFFFF; font-weight: bold; font-size: 15px; border-radius: 8px; border: none;}
+            QPushButton { 
+                background-color: #B09886; 
+                color: #FFFFFF; 
+                font-weight: bold; 
+                font-size: 13px; 
+                border-radius: 8px; 
+                border: none;
+                padding: 0 12px;
+            }
             QPushButton:hover { background-color: #9C8573; }
         """)
         self.btn_cobrar.clicked.connect(self.cobrar_venta)
 
         self.btn_cancelar = QPushButton("CANCELAR (F12)")
-        self.btn_cancelar.setObjectName("btn_danger")
-        self.btn_cancelar.setMinimumSize(120, 50)
+        self.btn_cancelar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_cancelar.setFixedHeight(44)
+        self.btn_cancelar.setMinimumWidth(130)
         self.btn_cancelar.setStyleSheet("""
-            QPushButton { background-color: #D99890; color: #FFFFFF; font-weight: bold; font-size: 15px; border-radius: 8px; border: none;}
+            QPushButton { 
+                background-color: #D99890; 
+                color: #FFFFFF; 
+                font-weight: bold; 
+                font-size: 13px; 
+                border-radius: 8px; 
+                border: none;
+                padding: 0 12px;
+            }
             QPushButton:hover { background-color: #C5847C; }
         """)
         self.btn_cancelar.clicked.connect(self.cancelar_venta)
 
-        bottom_layout.addWidget(self.btn_cobrar)
-        bottom_layout.addWidget(self.btn_cancelar)
+        btn_action_layout.addWidget(self.btn_cobrar)
+        btn_action_layout.addWidget(self.btn_cancelar)
+        bottom_layout.addLayout(btn_action_layout)
 
         # Selector de Medio de Pago
         pago_layout = QVBoxLayout()
         pago_layout.setSpacing(2)
-        pago_layout.addWidget(QLabel("Medio de Pago:"))
+        lbl_mp = QLabel("Medio de Pago:")
+        lbl_mp.setStyleSheet("font-size: 11px; font-weight: bold; color: #2C2520;")
+        pago_layout.addWidget(lbl_mp)
         self.cb_medio_pago = QComboBox()
         self.cb_medio_pago.addItems(["EFECTIVO", "TRANSFERENCIA", "TARJETA", "MIXTO", "FIADO / CTA. CTE."])
-        self.cb_medio_pago.setStyleSheet("font-size: 13px; font-weight: bold; padding: 2px;")
-        self.cb_medio_pago.setFixedHeight(36)
-        self.cb_medio_pago.setMinimumWidth(140)
+        self.cb_medio_pago.setStyleSheet("font-size: 12px; font-weight: bold; padding: 3px 6px;")
+        self.cb_medio_pago.setFixedHeight(32)
+        self.cb_medio_pago.setMinimumWidth(135)
         self.cb_medio_pago.currentIndexChanged.connect(self.actualizar_tabla)
         pago_layout.addWidget(self.cb_medio_pago)
         pago_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         bottom_layout.addLayout(pago_layout)
+
+        bottom_layout.addStretch()
 
         # Contenedor para el total
         total_layout = QVBoxLayout()
         total_layout.setSpacing(0)
         
         self.lbl_descuento = QLabel("")
-        self.lbl_descuento.setFont(QFont("Segoe UI", 10))
+        self.lbl_descuento.setFont(QFont("Segoe UI", 9))
         self.lbl_descuento.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
-        self.lbl_descuento.setStyleSheet("color: #D99890;")
+        self.lbl_descuento.setStyleSheet("color: #D99890; font-weight: 500;")
         
         self.lbl_total = QLabel("$0.00")
-        self.lbl_total.setFont(QFont("Segoe UI", 28, QFont.Weight.Bold))
+        self.lbl_total.setFont(QFont("Segoe UI", 26, QFont.Weight.Bold))
         self.lbl_total.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.lbl_total.setStyleSheet("color: #000000; padding: 0px 2px;")
         
         total_layout.addWidget(self.lbl_descuento)
         total_layout.addWidget(self.lbl_total)
         
-        bottom_layout.addLayout(total_layout, 3)
+        bottom_layout.addLayout(total_layout)
 
-        layout_principal.addWidget(bottom_frame)
+        layout_principal.addWidget(bottom_frame, 0)
 
         # --- Atajos ---
         QShortcut(QKeySequence("F5"), self, self.cobrar_venta)

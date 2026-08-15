@@ -60,15 +60,33 @@ class EtiquetaPreviewWidget(QFrame):
         h = self.height()
 
         # 1. Nombre del Producto (Arriba centro)
-        nombre = str(self.producto.get('nombre', 'Sin Nombre')).upper()
-        font_nombre = QFont("Segoe UI", 10, QFont.Weight.Bold)
+        nombre_base = str(self.producto.get('nombre', 'Sin Nombre')).strip().upper()
+        categoria = self.producto.get('categoria_nombre') or ''
+        if not categoria and self.producto.get('categoria_id'):
+            cats = DataCache.get_categorias()
+            for c in cats:
+                if c.get('id') == self.producto.get('categoria_id'):
+                    categoria = c.get('nombre', '')
+                    break
+        categoria = categoria.strip().upper()
+
+        font_nombre = QFont("Segoe UI", 9, QFont.Weight.Bold)
         painter.setFont(font_nombre)
         painter.setPen(QColor("#1C1613"))
-
-        rect_nombre = QRectF(10, 12, w - 20, 25)
+        rect_nombre = QRectF(10, 8, w - 20, 18)
         metrics = QFontMetrics(font_nombre)
-        elided_nombre = metrics.elidedText(nombre, Qt.TextElideMode.ElideRight, int(rect_nombre.width()))
+        elided_nombre = metrics.elidedText(nombre_base, Qt.TextElideMode.ElideRight, int(rect_nombre.width()))
         painter.drawText(rect_nombre, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, elided_nombre)
+
+        # Categoría (Debajo del nombre)
+        if categoria:
+            font_cat = QFont("Segoe UI", 7, QFont.Weight.Normal)
+            painter.setFont(font_cat)
+            painter.setPen(QColor("#7A7067"))
+            rect_cat = QRectF(10, 24, w - 20, 14)
+            metrics_cat = QFontMetrics(font_cat)
+            elided_cat = metrics_cat.elidedText(categoria, Qt.TextElideMode.ElideRight, int(rect_cat.width()))
+            painter.drawText(rect_cat, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, elided_cat)
 
         # 2. Código de Barras (Centro)
         if self.pixmap_barcode and not self.pixmap_barcode.isNull():
@@ -291,7 +309,20 @@ class ImpresorEtiquetasDialog(QDialog):
         codigo_barras = self.producto_actual.get('codigo_barras') or f"1{self.producto_actual.get('id', 0):05d}"
         pixmap_bc = generar_barcode_pixmap(str(codigo_barras))
 
-        nombre = str(self.producto_actual.get('nombre', '')).upper()
+        nombre_base = str(self.producto_actual.get('nombre', '')).strip()
+        categoria = self.producto_actual.get('categoria_nombre') or ''
+        if not categoria and self.producto_actual.get('categoria_id'):
+            cats = DataCache.get_categorias()
+            for c in cats:
+                if c.get('id') == self.producto_actual.get('categoria_id'):
+                    categoria = c.get('nombre', '')
+                    break
+
+        if categoria:
+            nombre = f"{nombre_base} - {categoria}".upper()
+        else:
+            nombre = nombre_base.upper()
+
         id_corto_txt = str(self.producto_actual.get('id', ''))
         codigo_text = str(codigo_barras)
 
@@ -299,15 +330,25 @@ class ImpresorEtiquetasDialog(QDialog):
             if i > 0:
                 printer.newPage()
 
-            # 1. Nombre del Producto (Arriba Centro)
-            font_nombre = QFont("Segoe UI", 8, QFont.Weight.Bold)
+            # 1. Nombre del Producto (Arriba Centro superior)
+            font_nombre = QFont("Segoe UI", 7, QFont.Weight.Bold)
             painter.setFont(font_nombre)
             painter.setPen(QColor("#000000"))
 
-            rect_nombre = QRectF(w * 0.05, h * 0.05, w * 0.90, h * 0.20)
+            rect_nombre = QRectF(w * 0.05, h * 0.04, w * 0.90, h * 0.12)
             metrics = QFontMetrics(font_nombre)
-            elided_nombre = metrics.elidedText(nombre, Qt.TextElideMode.ElideRight, int(rect_nombre.width()))
+            elided_nombre = metrics.elidedText(nombre_base, Qt.TextElideMode.ElideRight, int(rect_nombre.width()))
             painter.drawText(rect_nombre, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, elided_nombre)
+
+            # Categoría (Debajo del nombre)
+            if categoria:
+                font_cat = QFont("Segoe UI", 6, QFont.Weight.Normal)
+                painter.setFont(font_cat)
+                painter.setPen(QColor("#555555"))
+                rect_cat = QRectF(w * 0.05, h * 0.14, w * 0.90, h * 0.10)
+                metrics_cat = QFontMetrics(font_cat)
+                elided_cat = metrics_cat.elidedText(categoria, Qt.TextElideMode.ElideRight, int(rect_cat.width()))
+                painter.drawText(rect_cat, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, elided_cat)
 
             # 2. Código de Barras (Centro, ~48% alto)
             if pixmap_bc and not pixmap_bc.isNull():
