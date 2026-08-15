@@ -154,32 +154,34 @@ class ProductosView(QWidget):
         self.txt_utilidad = NumericLineEdit("0.00")
         g_layout.addWidget(self.txt_utilidad, 2, 5)
 
-        # Fila 3
-        g_layout.addWidget(QLabel("Precio Venta:"), 3, 0)
+        # Fila 3: Precios Contado y Tarjeta/Lista
+        g_layout.addWidget(QLabel("P. Efectivo/Transf:"), 3, 0)
         self.txt_precio_contado = NumericLineEdit("0.00")
         g_layout.addWidget(self.txt_precio_contado, 3, 1)
 
-        g_layout.addWidget(QLabel("Stock Actual:"), 3, 2)
-        self.txt_stock_actual = NumericLineEdit("0")
-        g_layout.addWidget(self.txt_stock_actual, 3, 3)
+        g_layout.addWidget(QLabel("P. Tarjeta/Lista:"), 3, 2)
+        self.txt_precio_tarjeta = NumericLineEdit("0.00")
+        g_layout.addWidget(self.txt_precio_tarjeta, 3, 3)
 
-        g_layout.addWidget(QLabel("Stock Mín / Máx:"), 3, 4)
-        min_max_layout = QHBoxLayout()
-        min_max_layout.setContentsMargins(0, 0, 0, 0)
-        min_max_layout.setSpacing(5)
+        g_layout.addWidget(QLabel("Stock Act / Mín / Máx:"), 3, 4)
+        stock_layout = QHBoxLayout()
+        stock_layout.setContentsMargins(0, 0, 0, 0)
+        stock_layout.setSpacing(4)
+        self.txt_stock_actual = NumericLineEdit("0")
         self.txt_stock_min = NumericLineEdit("5")
         self.txt_stock_max = NumericLineEdit("100")
-        min_max_layout.addWidget(self.txt_stock_min)
-        min_max_layout.addWidget(self.txt_stock_max)
-        g_layout.addLayout(min_max_layout, 3, 5)
+        stock_layout.addWidget(self.txt_stock_actual)
+        stock_layout.addWidget(self.txt_stock_min)
+        stock_layout.addWidget(self.txt_stock_max)
+        g_layout.addLayout(stock_layout, 3, 5)
 
         # Fila 4: Trazabilidad (Solo visible para Administradores)
         from src.core.auth_manager import AuthManager
         self.lbl_trazabilidad_titulo = QLabel("Modificado por:")
-        self.lbl_trazabilidad_titulo.setStyleSheet("font-weight: bold; color: #7A7067; font-size: 12px;")
+        self.lbl_trazabilidad_titulo.setStyleSheet("font-weight: bold; color: #7A7067; font-size: 11px;")
         
         self.lbl_modificado_por = QLabel("Sin modificaciones registradas")
-        self.lbl_modificado_por.setStyleSheet("color: #2C2520; font-size: 12px; font-weight: 600; font-style: italic;")
+        self.lbl_modificado_por.setStyleSheet("color: #2C2520; font-size: 11px; font-weight: 600; font-style: italic;")
         
         es_admin = AuthManager.is_admin()
         self.lbl_trazabilidad_titulo.setVisible(es_admin)
@@ -189,23 +191,10 @@ class ProductosView(QWidget):
         g_layout.addWidget(self.lbl_modificado_por, 4, 1, 1, 5)
 
         # Ocultos
-        self.txt_precio_tarjeta = NumericLineEdit("0.00")
-        self.txt_precio_tarjeta.setVisible(False)
         self.txt_ubicacion = QLineEdit("")
         self.txt_ubicacion.setVisible(False)
         self.lbl_creado_por = QLabel("-")
         self.lbl_creado_por.setVisible(False)
-        
-        from src.core.auth_manager import AuthManager
-        self.lbl_modificado_por = QLabel("-")
-        if AuthManager.is_admin():
-            lbl_mod = QLabel("Modificado por:")
-            lbl_mod.setStyleSheet("color: #7A7067; font-size: 11px;")
-            self.lbl_modificado_por.setStyleSheet("color: #7A7067; font-size: 11px; font-weight: bold;")
-            g_layout.addWidget(lbl_mod, 4, 4, Qt.AlignmentFlag.AlignRight)
-            g_layout.addWidget(self.lbl_modificado_por, 4, 5)
-        else:
-            self.lbl_modificado_por.setVisible(False)
 
         form_layout.addWidget(g_frame)
 
@@ -215,49 +204,61 @@ class ProductosView(QWidget):
         self.txt_utilidad.textEdited.connect(self.calcular_precios_desde_costo)
         self.txt_precio_contado.textEdited.connect(self.calcular_utilidad_desde_precio)
 
-        # --- BOTONES DE ACCIÓN ---
+        # --- BOTONES DE ACCIÓN (ESTILO COMPACTO Y DELICADO) ---
         btn_layout = QHBoxLayout()
-        
+        btn_layout.setContentsMargins(0, 4, 0, 4)
+        btn_layout.setSpacing(8)
+
+        btn_estilo_delicado = """
+            QPushButton {
+                min-height: 28px;
+                padding: 4px 12px;
+                font-size: 12px;
+                border-radius: 6px;
+            }
+        """
+
         self.btn_limpiar = QPushButton("Limpiar/Nuevo")
         self.btn_limpiar.setObjectName("btn_neutral")
-
+        self.btn_limpiar.setStyleSheet(btn_estilo_delicado)
         self.btn_limpiar.clicked.connect(self.limpiar_formulario)
         
         self.btn_eliminar = QPushButton("Eliminar")
         self.btn_eliminar.setObjectName("btn_danger")
-
+        self.btn_eliminar.setStyleSheet(btn_estilo_delicado)
         self.btn_eliminar.clicked.connect(self.eliminar_producto)
         self.btn_eliminar.setEnabled(False)
 
         self.btn_restaurar = QPushButton("Restaurar")
         self.btn_restaurar.setObjectName("btn_primary")
-
+        self.btn_restaurar.setStyleSheet(btn_estilo_delicado)
         self.btn_restaurar.clicked.connect(self.restaurar_producto)
         self.btn_restaurar.setVisible(False)
 
         self.btn_ficha = QPushButton("Ver Ficha")
         self.btn_ficha.setObjectName("btn_neutral")
-
+        self.btn_ficha.setStyleSheet(btn_estilo_delicado)
         self.btn_ficha.clicked.connect(self.ver_ficha_producto)
         self.btn_ficha.setEnabled(False)
 
         self.btn_imprimir_etiqueta = QPushButton("Imprimir Etiqueta")
         self.btn_imprimir_etiqueta.setObjectName("btn_neutral")
+        self.btn_imprimir_etiqueta.setStyleSheet(btn_estilo_delicado)
         self.btn_imprimir_etiqueta.clicked.connect(self.abrir_impresor_etiquetas)
+
+        self.btn_duplicar = QPushButton("Duplicar")
+        self.btn_duplicar.setObjectName("btn_primary")
+        self.btn_duplicar.setStyleSheet(btn_estilo_delicado)
+        self.btn_duplicar.clicked.connect(self.duplicar_producto)
 
         self.btn_grabar = QPushButton("Guardar (F5)")
         self.btn_grabar.setObjectName("btn_primary")
-
+        self.btn_grabar.setStyleSheet(btn_estilo_delicado)
         self.btn_grabar.clicked.connect(self.grabar_producto)
         
         self.shortcut_f5 = QShortcut(QKeySequence("F5"), self)
         self.shortcut_f5.activated.connect(self.grabar_producto)
         self.shortcut_f5.setContext(Qt.ShortcutContext.WindowShortcut)
-        
-        self.btn_duplicar = QPushButton("Duplicar")
-        self.btn_duplicar.setObjectName("btn_primary")
-
-        self.btn_duplicar.clicked.connect(self.duplicar_producto)
 
         btn_layout.addWidget(self.btn_limpiar)
         btn_layout.addWidget(self.btn_eliminar)
@@ -304,14 +305,14 @@ class ProductosView(QWidget):
         
         grid_layout.addLayout(search_layout)
 
-        self.tabla = QTableWidget(0, 5)
+        self.tabla = QTableWidget(0, 6)
 
-        self.tabla.setHorizontalHeaderLabels(["Código", "Descripción", "Talle", "Precio", "Stock"])
+        self.tabla.setHorizontalHeaderLabels(["Código", "Descripción", "Talle", "P. Contado", "P. Tarjeta", "Stock"])
         self.tabla.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.verticalHeader().setVisible(True)
-        self.tabla.verticalHeader().setDefaultSectionSize(40)
+        self.tabla.verticalHeader().setDefaultSectionSize(32)
         self.tabla.cellDoubleClicked.connect(self.cargar_producto_para_edicion)
         grid_layout.addWidget(self.tabla)
 
@@ -412,16 +413,19 @@ class ProductosView(QWidget):
                 self.tabla.setItem(row_idx, 1, item_nombre)
                 self.tabla.setItem(row_idx, 2, QTableWidgetItem(str(p.get('talle') or "")))
                 
-                # Conversión segura de precio
+                # Conversión segura de precios
                 try:
-                    precio = float(p.get('precio_contado') or 0.0)
+                    p_cont = float(p.get('precio_contado') or 0.0)
+                    p_tarj = float(p.get('precio_tarjeta') or p_cont)
                 except (ValueError, TypeError):
-                    precio = 0.0
-                self.tabla.setItem(row_idx, 3, QTableWidgetItem(f"{precio:.2f}"))
+                    p_cont = 0.0
+                    p_tarj = 0.0
+                self.tabla.setItem(row_idx, 3, QTableWidgetItem(f"${p_cont:.2f}"))
+                self.tabla.setItem(row_idx, 4, QTableWidgetItem(f"${p_tarj:.2f}"))
                 
                 # Conversión segura de stock
                 stock_val = p.get('stock_actual', 0)
-                self.tabla.setItem(row_idx, 4, QTableWidgetItem(str(stock_val if stock_val is not None else 0)))
+                self.tabla.setItem(row_idx, 5, QTableWidgetItem(str(stock_val if stock_val is not None else 0)))
         except Exception as e:
             print(f"Error cargando grilla de productos: {e}")
         finally:
@@ -611,7 +615,7 @@ class ProductosView(QWidget):
                     flete=float(self.txt_flete.text()),
                     utilidad_porcentaje=float(self.txt_utilidad.text()),
                     precio_contado=float(self.txt_precio_contado.text()),
-                    precio_tarjeta=float(self.txt_precio_contado.text()),
+                    precio_tarjeta=float(self.txt_precio_tarjeta.text()),
                     stock_actual=float(self.txt_stock_actual.text()),
                     stock_minimo=float(self.txt_stock_min.text()),
                     stock_maximo=float(self.txt_stock_max.text()),
@@ -631,7 +635,7 @@ class ProductosView(QWidget):
                     flete=float(self.txt_flete.text()),
                     utilidad_porcentaje=float(self.txt_utilidad.text()),
                     precio_contado=float(self.txt_precio_contado.text()),
-                    precio_tarjeta=float(self.txt_precio_contado.text()),
+                    precio_tarjeta=float(self.txt_precio_tarjeta.text()),
                     stock_actual=float(self.txt_stock_actual.text()),
                     stock_minimo=float(self.txt_stock_min.text()),
                     stock_maximo=float(self.txt_stock_max.text()),

@@ -404,16 +404,17 @@ class POSView(QWidget):
             self.txt_codigo.clear()
             return
 
-        # Obtener precio de lista (tarjeta) como precio base sobre el que aplican los descuentos
         try:
-            precio_a_cobrar = float(producto.get('precio_tarjeta') or producto.get('precio_contado') or 0.0)
+            p_tarjeta = float(producto.get('precio_tarjeta') or producto.get('precio_contado') or 0.0)
+            p_contado = float(producto.get('precio_contado') or p_tarjeta)
         except (ValueError, TypeError):
-            precio_a_cobrar = 0.0
+            p_tarjeta = 0.0
+            p_contado = 0.0
         
-        # Verificar si ya está en el carrito para sumar cantidad (y chequear que sea el mismo precio)
+        # Verificar si ya está en el carrito para sumar cantidad
         encontrado = False
         for item in self.carrito:
-            if item['producto_id'] == producto['id'] and item['precio_unitario'] == precio_a_cobrar:
+            if item['producto_id'] == producto['id'] and item['precio_unitario'] == p_tarjeta:
                 item['cantidad'] += 1
                 encontrado = True
                 break
@@ -425,7 +426,9 @@ class POSView(QWidget):
                 'nombre': producto['nombre'],
                 'talle': producto.get('talle') or "",
                 'cantidad': 1,
-                'precio_unitario': precio_a_cobrar,
+                'precio_unitario': p_tarjeta,
+                'precio_contado': p_contado,
+                'precio_tarjeta': p_tarjeta,
                 'es_promo': False
             })
 
@@ -543,16 +546,20 @@ class POSView(QWidget):
             self.tabla_carrito.setItem(row_idx, 5, item_imp)
 
         medio_pago = self.cb_medio_pago.currentText()
-        descuento_medio_pago = 30.0 if medio_pago in ["EFECTIVO", "TRANSFERENCIA"] else 0.0
-        pct_descuento_total = self.descuento_actual + descuento_medio_pago
-
-        if pct_descuento_total > 0:
-            descuento_monto = total * (pct_descuento_total / 100.0)
-            total_final = total - descuento_monto
+        
+        # Si es efectivo o transferencia, el total base surge de precio_contado
+        if medio_pago in ["EFECTIVO", "TRANSFERENCIA"]:
+            total_contado = 0.0
+            for item in self.carrito:
+                p_c = item.get('precio_contado', item['precio_unitario'])
+                total_contado += item['cantidad'] * p_c
             
-            detalles_desc = []
-            if descuento_medio_pago > 0:
-                detalles_desc.append(f"Desc. {medio_pago} (30%)")
+            # Aplicar descuento de cliente sobre el precio de contado si existiera
+            descuento_cliente = total_contado * (self.descuento_actual / 100.0) if self.descuento_actual > 0 else 0.0
+            total_final = total_contado - descuento_cliente
+            descuento_monto = total - total_final
+
+            detalles_desc = [f"Desc. {medio_pago}"]
             if self.descuento_actual > 0:
                 detalles_desc.append(f"Desc. Cliente ({self.descuento_actual:.0f}%)")
             
@@ -560,8 +567,17 @@ class POSView(QWidget):
             self.lbl_descuento.setText(f"Precio Lista: ${total:.2f} | {lbl_desc_str}: -${descuento_monto:.2f}")
             self.lbl_total.setText(f"${total_final:.2f}")
         else:
-            self.lbl_descuento.setText(f"Precio Lista: ${total:.2f}")
-            self.lbl_total.setText(f"${total:.2f}")
+            # Tarjeta, Fiado, etc. -> Precio Lista
+            descuento_cliente = total * (self.descuento_actual / 100.0) if self.descuento_actual > 0 else 0.0
+            total_final = total - descuento_cliente
+            descuento_monto = descuento_cliente
+            
+            if self.descuento_actual > 0:
+                self.lbl_descuento.setText(f"Precio Lista: ${total:.2f} | Desc. Cliente ({self.descuento_actual:.0f}%): -${descuento_monto:.2f}")
+            else:
+                self.lbl_descuento.setText(f"Precio Lista: ${total:.2f}")
+            self.lbl_total.setText(f"${total_final:.2f}")
+
         self._actualizando_tabla = False
 
     def al_cambiar_celda(self, item):
@@ -622,11 +638,18 @@ class POSView(QWidget):
             for item in self.carrito:
                 total_venta += item['cantidad'] * item['precio_unitario']
                 
-            descuento_medio_pago = 30.0 if metodo_pago_seleccionado in ["EFECTIVO", "TRANSFERENCIA"] else 0.0
-            pct_descuento_total = self.descuento_actual + descuento_medio_pago
-            
-            descuento_monto = total_venta * (pct_descuento_total / 100.0)
-            total_final = total_venta - descuento_monto
+            if metodo_pago_seleccionado in ["EFECTIVO", "TRANSFERENCIA"]:
+                total_contado = 0.0
+                for item in self.carrito:
+                    p_c = item.get('precio_contado', item['precio_unitario'])
+                    total_contado += item['cantidad'] * p_c
+                descuento_cliente = total_contado * (self.descuento_actual / 100.0) if self.descuento_actual > 0 else 0.0
+                total_final = total_contado - descuento_cliente
+                descuento_monto = total_venta - total_final
+            else:
+                descuento_cliente = total_venta * (self.descuento_actual / 100.0) if self.descuento_actual > 0 else 0.0
+                total_final = total_venta - descuento_cliente
+                descuento_monto = descuento_cliente
             
             if metodo_pago_seleccionado == "EFECTIVO":
                 pago, ok = QInputDialog.getDouble(

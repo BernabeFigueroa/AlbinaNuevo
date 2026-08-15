@@ -15,19 +15,20 @@ class VentasManager:
             raise Exception("Debe abrir la caja antes de realizar una venta.")
 
         subtotal = sum(item['cantidad'] * item['precio_unitario'] for item in carrito)
-        pct_descuento = 0.0
-        if metodo_pago in ['EFECTIVO', 'TRANSFERENCIA']:
-            pct_descuento += 30.0
-
-        supabase = get_supabase()
         
-        # Validar si el cliente tiene descuento adicional
+        supabase = get_supabase()
         res_cliente = supabase.table('clientes').select('descuento_porcentaje').eq('id', cliente_id).execute()
-        if res_cliente.data and res_cliente.data[0].get('descuento_porcentaje', 0) > 0:
-            pct_descuento += res_cliente.data[0]['descuento_porcentaje']
-            
-        descuento_total = subtotal * (pct_descuento / 100.0)
-        total = subtotal - descuento_total
+        pct_descuento_cliente = float(res_cliente.data[0].get('descuento_porcentaje', 0) if res_cliente.data else 0)
+
+        if metodo_pago in ['EFECTIVO', 'TRANSFERENCIA']:
+            total_contado = sum(item['cantidad'] * float(item.get('precio_contado', item['precio_unitario'])) for item in carrito)
+            descuento_cliente = total_contado * (pct_descuento_cliente / 100.0) if pct_descuento_cliente > 0 else 0.0
+            total = total_contado - descuento_cliente
+            descuento_total = subtotal - total
+        else:
+            descuento_cliente = subtotal * (pct_descuento_cliente / 100.0) if pct_descuento_cliente > 0 else 0.0
+            total = subtotal - descuento_cliente
+            descuento_total = descuento_cliente
 
         user = AuthManager.get_current_user()
         usuario_id = user.id if user else None

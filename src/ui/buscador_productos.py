@@ -80,9 +80,9 @@ class BuscadorProductosDialog(QDialog):
         layout.addLayout(search_layout)
         
         # Grilla
-        self.tabla = QTableWidget(0, 6)
+        self.tabla = QTableWidget(0, 7)
  
-        self.tabla.setHorizontalHeaderLabels(["Cód. Interno", "Cód. Barras", "Nombre del Producto", "Talle", "P. Lista/Tarjeta", "Stock"])
+        self.tabla.setHorizontalHeaderLabels(["Cód. Interno", "Cód. Barras", "Nombre del Producto", "Talle", "P. Contado", "P. Tarjeta/Lista", "Stock"])
         self.tabla.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -133,11 +133,14 @@ class BuscadorProductosDialog(QDialog):
             self.tabla.setItem(row_idx, 2, QTableWidgetItem(p['nombre']))
             self.tabla.setItem(row_idx, 3, QTableWidgetItem(p.get('talle') or ""))
             try:
-                precio_val = float(p.get('precio_tarjeta') or p.get('precio_contado') or 0.0)
+                p_cont = float(p.get('precio_contado') or 0.0)
+                p_tarj = float(p.get('precio_tarjeta') or p_cont)
             except (ValueError, TypeError):
-                precio_val = 0.0
-            self.tabla.setItem(row_idx, 4, QTableWidgetItem(f"${precio_val:.2f}"))
-            self.tabla.setItem(row_idx, 5, QTableWidgetItem(str(p['stock_actual'])))
+                p_cont = 0.0
+                p_tarj = 0.0
+            self.tabla.setItem(row_idx, 4, QTableWidgetItem(f"${p_cont:.2f}"))
+            self.tabla.setItem(row_idx, 5, QTableWidgetItem(f"${p_tarj:.2f}"))
+            self.tabla.setItem(row_idx, 6, QTableWidgetItem(str(p['stock_actual'])))
 
         promociones = PromocionesManager.get_all()
         for p in promociones:
