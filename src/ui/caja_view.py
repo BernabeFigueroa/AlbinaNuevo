@@ -5,8 +5,30 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
+from datetime import datetime, timezone, timedelta
+try:
+    import zoneinfo
+except ImportError:
+    zoneinfo = None
 
 from src.core.caja_manager import CajaManager
+
+def formatear_fecha_ar(fecha_str):
+    if not fecha_str:
+        return "-"
+    try:
+        dt = datetime.fromisoformat(str(fecha_str).replace('Z', '+00:00'))
+        if zoneinfo:
+            try:
+                dt = dt.astimezone(zoneinfo.ZoneInfo("America/Argentina/Buenos_Aires"))
+            except Exception:
+                dt = dt.astimezone(timezone(timedelta(hours=-3)))
+        else:
+            dt = dt.astimezone(timezone(timedelta(hours=-3)))
+        return dt.strftime("%d/%m/%Y %H:%M hs")
+    except Exception:
+        # Fallback simple
+        return str(fecha_str)[:16].replace("T", " ")
 
 class CajaView(QWidget):
     def __init__(self):
@@ -262,10 +284,12 @@ class CajaView(QWidget):
         self.sesion_activa = CajaManager.obtener_sesion_activa()
         
         if self.sesion_activa:
-            self.lbl_estado_caja.setText(f"● ABIERTA (Inicio: {self.sesion_activa['fecha_apertura']})")
+            fecha_apertura_limpia = formatear_fecha_ar(self.sesion_activa.get('fecha_apertura'))
+            self.lbl_estado_caja.setText(f"● ABIERTA (Inicio: {fecha_apertura_limpia})")
             self.lbl_estado_caja.setStyleSheet("color: #B09886;")
             self.frame_apertura.setVisible(False)
             self.frame_movimientos.setVisible(True)
+            self.frame_tabla.setVisible(True)
             self.frame_cierre.setVisible(True)
             self.cargar_resumen()
         else:
@@ -327,12 +351,7 @@ class CajaView(QWidget):
             row = self.tabla_movs.rowCount()
             self.tabla_movs.insertRow(row)
             
-            fecha_str = m.get('fecha') or ''
-            try:
-                fecha_dt = datetime.fromisoformat(fecha_str.replace('Z', '+00:00'))
-                fecha_str = fecha_dt.strftime('%d/%m/%Y %H:%M')
-            except Exception:
-                pass
+            fecha_str = formatear_fecha_ar(m.get('fecha'))
             item_fecha = QTableWidgetItem(fecha_str)
             item_fecha.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.tabla_movs.setItem(row, 0, item_fecha)

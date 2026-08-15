@@ -4,10 +4,31 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
+from datetime import datetime, timezone, timedelta
+try:
+    import zoneinfo
+except ImportError:
+    zoneinfo = None
 
 from src.core.clientes_manager import ClientesManager
 from src.core.cta_cte_manager import CtaCteManager
 from src.core.caja_manager import CajaManager
+
+def formatear_fecha_ar(fecha_str):
+    if not fecha_str:
+        return "-"
+    try:
+        dt = datetime.fromisoformat(str(fecha_str).replace('Z', '+00:00'))
+        if zoneinfo:
+            try:
+                dt = dt.astimezone(zoneinfo.ZoneInfo("America/Argentina/Buenos_Aires"))
+            except Exception:
+                dt = dt.astimezone(timezone(timedelta(hours=-3)))
+        else:
+            dt = dt.astimezone(timezone(timedelta(hours=-3)))
+        return dt.strftime("%d/%m/%Y %H:%M hs")
+    except Exception:
+        return str(fecha_str)[:16].replace("T", " ")
 
 class DeudoresView(QWidget):
     def __init__(self):
@@ -122,7 +143,7 @@ class DeudoresView(QWidget):
             row = self.tabla.rowCount()
             self.tabla.insertRow(row)
             
-            item_fecha = QTableWidgetItem(h['fecha'])
+            item_fecha = QTableWidgetItem(formatear_fecha_ar(h['fecha']))
             if 'venta_id' in h and h['venta_id']:
                 item_fecha.setData(Qt.ItemDataRole.UserRole, h['venta_id'])
             self.tabla.setItem(row, 0, item_fecha)

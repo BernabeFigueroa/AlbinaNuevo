@@ -4,10 +4,31 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
+from datetime import datetime, timezone, timedelta
+try:
+    import zoneinfo
+except ImportError:
+    zoneinfo = None
 
 from src.core.proveedores_manager import ProveedoresManager
 from src.core.cta_cte_proveedores_manager import CtaCteProveedoresManager
 from src.core.caja_manager import CajaManager
+
+def formatear_fecha_ar(fecha_str):
+    if not fecha_str:
+        return "-"
+    try:
+        dt = datetime.fromisoformat(str(fecha_str).replace('Z', '+00:00'))
+        if zoneinfo:
+            try:
+                dt = dt.astimezone(zoneinfo.ZoneInfo("America/Argentina/Buenos_Aires"))
+            except Exception:
+                dt = dt.astimezone(timezone(timedelta(hours=-3)))
+        else:
+            dt = dt.astimezone(timezone(timedelta(hours=-3)))
+        return dt.strftime("%d/%m/%Y %H:%M hs")
+    except Exception:
+        return str(fecha_str)[:16].replace("T", " ")
 
 class DeudasProveedoresView(QWidget):
     def __init__(self):
@@ -26,7 +47,6 @@ class DeudasProveedoresView(QWidget):
 
         # --- Filtro ---
         filtro_frame = QFrame()
-
         filtro_layout = QHBoxLayout(filtro_frame)
         
         filtro_layout.addWidget(QLabel("Seleccionar Proveedor:"))
@@ -46,20 +66,18 @@ class DeudasProveedoresView(QWidget):
         # --- Resumen ---
         resumen_frame = QFrame()
         resumen_layout = QHBoxLayout(resumen_frame)
-        self.lbl_saldo = QLabel("Saldo Pendiente: $0.00")
+        self.lbl_saldo = QLabel("Saldo Deuda: $0.00")
         self.lbl_saldo.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
         self.lbl_saldo.setStyleSheet("color: #D99890;")
         resumen_layout.addWidget(self.lbl_saldo)
         
         resumen_layout.addStretch()
         
-        self.btn_registrar_deuda = QPushButton("REGISTRAR DEUDA (COMPRA)")
+        self.btn_deuda = QPushButton("+ REGISTRAR DEUDA")
+        self.btn_deuda.clicked.connect(self.registrar_deuda)
+        resumen_layout.addWidget(self.btn_deuda)
 
-        self.btn_registrar_deuda.clicked.connect(self.registrar_deuda)
-        resumen_layout.addWidget(self.btn_registrar_deuda)
-
-        self.btn_pagar = QPushButton("REGISTRAR PAGO (EGRESO)")
-
+        self.btn_pagar = QPushButton("REGISTRAR PAGO")
         self.btn_pagar.clicked.connect(self.registrar_pago)
         resumen_layout.addWidget(self.btn_pagar)
         layout.addWidget(resumen_frame)
@@ -78,19 +96,19 @@ class DeudasProveedoresView(QWidget):
         self.cb_proveedores.clear()
         proveedores = ProveedoresManager.get_all()
         for p in proveedores:
-            self.cb_proveedores.addItem(p['nombre'], p['id'])
+            self.cb_proveedores.addItem(f"{p['nombre']}", p['id'])
         self.cb_proveedores.blockSignals(False)
         self.cargar_datos_proveedor()
 
     def cargar_datos_proveedor(self):
         proveedor_id = self.cb_proveedores.currentData()
         if not proveedor_id:
-            self.lbl_saldo.setText("Saldo Pendiente: $0.00")
+            self.lbl_saldo.setText("Saldo Deuda: $0.00")
             self.tabla.setRowCount(0)
             return
             
         saldo = CtaCteProveedoresManager.get_saldo(proveedor_id)
-        self.lbl_saldo.setText(f"Saldo Pendiente: ${saldo:.2f}")
+        self.lbl_saldo.setText(f"Deuda Pendiente: ${saldo:.2f}")
         if saldo > 0:
             self.lbl_saldo.setStyleSheet("color: #D99890;")
         else:
@@ -102,7 +120,7 @@ class DeudasProveedoresView(QWidget):
             row = self.tabla.rowCount()
             self.tabla.insertRow(row)
             
-            item_fecha = QTableWidgetItem(h['fecha'])
+            item_fecha = QTableWidgetItem(formatear_fecha_ar(h['fecha']))
             self.tabla.setItem(row, 0, item_fecha)
             
             tipo_item = QTableWidgetItem(h['tipo'])
