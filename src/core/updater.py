@@ -7,7 +7,7 @@ from packaging import version
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout, QMessageBox, QApplication
 
-CURRENT_VERSION = "1.0.8"
+CURRENT_VERSION = "1.0.9"
 GITHUB_REPO = "BernabeFigueroa/AlbinaNuevo"  # Repositorio oficial para releases/binarios
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
@@ -258,9 +258,7 @@ Start-Process -FilePath $currentExe
 """
 
     # VBScript para ejecutar PowerShell de forma completamente invisible y sin ventana negra
-    vbs_content = f"""Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run "powershell.exe -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File ""{updater_ps1}""", 0, False
-"""
+    vbs_content = 'Set WshShell = CreateObject("WScript.Shell")\n' + f'WshShell.Run "powershell.exe -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File ""{updater_ps1}""", 0, False\n'
 
     try:
         with open(updater_ps1, "w", encoding="utf-8") as f:
