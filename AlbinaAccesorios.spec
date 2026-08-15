@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('.env', '.'), ('logo-albina.png', '.'), ('app_icon.ico', '.'), ('assets', 'assets')],
+    datas=[('logo-albina.png', '.'), ('app_icon.ico', '.'), ('assets', 'assets')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

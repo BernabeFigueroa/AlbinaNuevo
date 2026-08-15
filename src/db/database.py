@@ -14,22 +14,23 @@ def get_supabase() -> Client:
     global _supabase_client
     if _supabase_client is None:
         import sys
+        # Cargar variables si existe archivo .env local
         if getattr(sys, 'frozen', False):
-            env_path = os.path.join(sys._MEIPASS, '.env')
-            if os.path.exists(env_path):
-                load_dotenv(env_path, override=True)
-            # También intentar cargar .env junto al ejecutable si existiera
             exe_env = os.path.join(os.path.dirname(sys.executable), '.env')
             if os.path.exists(exe_env):
                 load_dotenv(exe_env, override=True)
         else:
             load_dotenv(override=True)
             
-        url = os.getenv("SUPABASE_URL") or DEFAULT_SUPABASE_URL
-        key = os.getenv("SUPABASE_KEY") or DEFAULT_SUPABASE_KEY
+        url = os.getenv("SUPABASE_URL")
+        key = os.getenv("SUPABASE_KEY")
         
-        if not url or not key:
-            raise ValueError("Faltan credenciales de Supabase en la configuración.")
+        # Validar que no sea un placeholder inválido
+        if not url or not url.startswith("http") or "tu_url_aqui" in url:
+            url = DEFAULT_SUPABASE_URL
+            
+        if not key or len(key) < 20 or "tu_api_key_aqui" in key:
+            key = DEFAULT_SUPABASE_KEY
             
         _supabase_client = create_client(url, key)
     return _supabase_client
