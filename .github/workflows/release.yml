@@ -29,6 +29,12 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Preparar .env para compilacion
+        run: |
+          if (-not (Test-Path .env)) {
+            Copy-Item .env.template .env
+          }
+
       - name: Compilar con PyInstaller
         run: pyinstaller AlbinaAccesorios.spec --clean
 

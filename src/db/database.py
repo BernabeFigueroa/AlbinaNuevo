@@ -5,9 +5,9 @@ from dotenv import load_dotenv
 # Variable global para mantener el cliente conectado
 _supabase_client: Client = None
 
-# Credenciales predeterminadas del proyecto Albina
-DEFAULT_SUPABASE_URL = "https://lomupnnsjjqytdhsxfoa.supabase.co"
-DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvbXVwbm5zampxeXRkaHN4Zm9hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEyNTIzNzAsImV4cCI6MjA3NjgyODM3MH0.lzNoj8bgPAu6DpMQGmsX67bM8hgfdYHC48IEt5AYdU8"
+# Credenciales predeterminadas del proyecto Albina San Martin
+DEFAULT_SUPABASE_URL = "https://bvreeibnkivucjqzhgjo.supabase.co"
+DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2cmVlaWJua2l2dWNqcXpoZ2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyNDUwMDcsImV4cCI6MjA5OTgyMTAwN30.kHDlhqm3qEyemDzLcOLs4s1szuFn9Yvl4CsrQZm_t4U"
 
 def get_supabase() -> Client:
     """Retorna la instancia del cliente de Supabase (Singleton)"""
