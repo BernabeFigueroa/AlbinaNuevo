@@ -160,7 +160,7 @@ class DeudoresView(QWidget):
         if dialog.exec():
             monto, metodo = dialog.get_data()
             try:
-                CtaCteManager.registrar_pago(cliente_id, monto, sesion['id'], metodo_pago=metodo)
+                CtaCteManager.registrar_pago(cliente_id, monto, metodo_pago=metodo)
                 QMessageBox.information(self, "Éxito", f"Pago de ${monto:.2f} en {metodo} registrado.")
                 self.cargar_datos_cliente()
             except Exception as e:

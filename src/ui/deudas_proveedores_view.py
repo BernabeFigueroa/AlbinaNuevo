@@ -164,7 +164,7 @@ class DeudasProveedoresView(QWidget):
         if dialog.exec():
             monto, metodo = dialog.get_data()
             try:
-                CtaCteProveedoresManager.registrar_pago(proveedor_id, monto, sesion['id'], metodo_pago=metodo)
+                CtaCteProveedoresManager.registrar_pago(proveedor_id, monto, metodo_pago=metodo)
                 QMessageBox.information(self, "Éxito", f"Pago de ${monto:.2f} en {metodo} registrado.")
                 self.cargar_datos_proveedor()
             except Exception as e:
