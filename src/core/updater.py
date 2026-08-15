@@ -8,7 +8,7 @@ from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout, QMessageBox, QApplication
 
 CURRENT_VERSION = "1.0.3"
-GITHUB_REPO = "BernabeFigueroa/albina-ecommerce"  # Repositorio oficial de GitHub
+GITHUB_REPO = "BernabeFigueroa/albina-pos-releases"  # Repositorio público exclusivo para releases/binarios
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
 class UpdateCheckerThread(QThread):
