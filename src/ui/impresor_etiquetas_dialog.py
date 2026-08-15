@@ -19,7 +19,7 @@ class EtiquetaPreviewWidget(QFrame):
         self.setStyleSheet("""
             QFrame {
                 background-color: #FFFFFF;
-                border: 1px solid #D1C7BD;
+                border: 2px dashed #B09886;
                 border-radius: 8px;
             }
         """)
@@ -59,24 +59,16 @@ class EtiquetaPreviewWidget(QFrame):
         w = self.width()
         h = self.height()
 
-        # 1. Nombre del Producto (Arriba a la izquierda/centro)
+        # 1. Nombre del Producto (Arriba centro)
         nombre = str(self.producto.get('nombre', 'Sin Nombre')).upper()
         font_nombre = QFont("Segoe UI", 10, QFont.Weight.Bold)
         painter.setFont(font_nombre)
         painter.setPen(QColor("#1C1613"))
 
-        rect_nombre = QRectF(15, 12, w - 100, 25)
+        rect_nombre = QRectF(10, 12, w - 20, 25)
         metrics = QFontMetrics(font_nombre)
         elided_nombre = metrics.elidedText(nombre, Qt.TextElideMode.ElideRight, int(rect_nombre.width()))
-        painter.drawText(rect_nombre, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, elided_nombre)
-
-        # ID Interno Corto (Arriba a la derecha en tamaño pequeño)
-        id_corto = str(self.producto.get('id', ''))
-        font_id = QFont("Segoe UI", 8, QFont.Weight.Bold)
-        painter.setFont(font_id)
-        painter.setPen(QColor("#7A7067"))
-        rect_id = QRectF(w - 85, 12, 70, 25)
-        painter.drawText(rect_id, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, f"ID: {id_corto}")
+        painter.drawText(rect_nombre, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, elided_nombre)
 
         # 2. Código de Barras (Centro)
         if self.pixmap_barcode and not self.pixmap_barcode.isNull():
@@ -85,12 +77,14 @@ class EtiquetaPreviewWidget(QFrame):
 
         # 3. Código de Barras en Texto (Abajo)
         cod_barras = self.producto.get('codigo_barras') or f"1{self.producto.get('id', 0):05d}"
+        id_corto = str(self.producto.get('id', ''))
+        texto_abajo = f"{cod_barras} | ID: {id_corto}"
         font_codigo = QFont("Consolas", 10, QFont.Weight.Bold)
         painter.setFont(font_codigo)
         painter.setPen(QColor("#1C1613"))
 
         rect_codigo = QRectF(20, 123, w - 40, 25)
-        painter.drawText(rect_codigo, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, str(cod_barras))
+        painter.drawText(rect_codigo, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, texto_abajo)
 
 
 class ImpresorEtiquetasDialog(QDialog):
@@ -305,34 +299,28 @@ class ImpresorEtiquetasDialog(QDialog):
             if i > 0:
                 printer.newPage()
 
-            # 1. Nombre del Producto (Arriba a la izquierda, ~20% alto)
+            # 1. Nombre del Producto (Arriba Centro)
             font_nombre = QFont("Segoe UI", 8, QFont.Weight.Bold)
             painter.setFont(font_nombre)
             painter.setPen(QColor("#000000"))
 
-            rect_nombre = QRectF(w * 0.05, h * 0.05, w * 0.65, h * 0.20)
+            rect_nombre = QRectF(w * 0.05, h * 0.05, w * 0.90, h * 0.20)
             metrics = QFontMetrics(font_nombre)
             elided_nombre = metrics.elidedText(nombre, Qt.TextElideMode.ElideRight, int(rect_nombre.width()))
-            painter.drawText(rect_nombre, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, elided_nombre)
-
-            # ID Interno Corto (Arriba a la derecha, ~20% alto)
-            font_id = QFont("Segoe UI", 7, QFont.Weight.Bold)
-            painter.setFont(font_id)
-            painter.setPen(QColor("#555555"))
-            rect_id = QRectF(w * 0.72, h * 0.05, w * 0.23, h * 0.20)
-            painter.drawText(rect_id, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, f"ID: {id_corto_txt}")
+            painter.drawText(rect_nombre, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, elided_nombre)
 
             # 2. Código de Barras (Centro, ~48% alto)
             if pixmap_bc and not pixmap_bc.isNull():
                 rect_bc = QRectF(w * 0.05, h * 0.28, w * 0.90, h * 0.48)
                 painter.drawPixmap(rect_bc.toRect(), pixmap_bc)
 
-            # 3. Código numérico / interno (Abajo, ~18% alto)
+            # 3. Texto Inferior
+            texto_abajo = f"{codigo_text} | ID: {id_corto_txt}"
             font_cod = QFont("Consolas", 8, QFont.Weight.Bold)
             painter.setFont(font_cod)
             painter.setPen(QColor("#000000"))
 
             rect_cod = QRectF(w * 0.05, h * 0.78, w * 0.90, h * 0.18)
-            painter.drawText(rect_cod, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, codigo_text)
+            painter.drawText(rect_cod, Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter, texto_abajo)
 
         painter.end()

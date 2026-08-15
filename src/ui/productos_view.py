@@ -91,12 +91,12 @@ class ProductosView(QWidget):
 
     def init_ui(self):
         layout_principal = QVBoxLayout()
-        layout_principal.setContentsMargins(20, 20, 20, 20)
-        layout_principal.setSpacing(15)
+        layout_principal.setContentsMargins(10, 10, 10, 10)
+        layout_principal.setSpacing(8)
         self.setLayout(layout_principal)
 
         lbl_titulo = QLabel("MANTENIMIENTO DE ARTÍCULOS")
-        lbl_titulo.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
+        lbl_titulo.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
         lbl_titulo.setStyleSheet("color: #000000;")
         layout_principal.addWidget(lbl_titulo)
 
@@ -104,16 +104,21 @@ class ProductosView(QWidget):
         form_widget = QWidget()
         form_layout = QVBoxLayout(form_widget)
         form_layout.setContentsMargins(0,0,0,0)
+        form_layout.setSpacing(8)
 
-        # Bloque 1: Generales
+        # Un solo contenedor para el formulario
         g_frame = self.crear_seccion_frame()
         g_layout = QGridLayout(g_frame)
-        
-        g_layout.addWidget(QLabel("Nombre del Producto:"), 0, 0)
+        g_layout.setContentsMargins(15, 15, 15, 15)
+        g_layout.setVerticalSpacing(12)
+        g_layout.setHorizontalSpacing(15)
+
+        # Fila 0
+        g_layout.addWidget(QLabel("Nombre:"), 0, 0)
         self.txt_descripcion = QLineEdit()
         g_layout.addWidget(self.txt_descripcion, 0, 1, 1, 3)
 
-        g_layout.addWidget(QLabel("Cód. Barras (Opcional):"), 0, 4)
+        g_layout.addWidget(QLabel("Cód. Barras:"), 0, 4)
         self.txt_codigo_barras = QLineEdit()
         g_layout.addWidget(self.txt_codigo_barras, 0, 5)
 
@@ -123,84 +128,68 @@ class ProductosView(QWidget):
         self.txt_codigo_fabrica = QLineEdit()
         self.txt_codigo_fabrica.setVisible(False)
 
-        g_layout.addWidget(QLabel("Rubro/Categoría:"), 1, 0)
+        # Fila 1
+        g_layout.addWidget(QLabel("Categoría:"), 1, 0)
         self.cb_categoria = QComboBox()
         g_layout.addWidget(self.cb_categoria, 1, 1)
 
         g_layout.addWidget(QLabel("Proveedor:"), 1, 2)
         self.cb_proveedor = QComboBox()
-        g_layout.addWidget(self.cb_proveedor, 1, 3, 1, 3)
+        g_layout.addWidget(self.cb_proveedor, 1, 3)
 
-        form_layout.addWidget(g_frame)
+        g_layout.addWidget(QLabel("Talle:"), 1, 4)
+        self.txt_talle = QLineEdit("")
+        g_layout.addWidget(self.txt_talle, 1, 5)
 
-        # Bloque 2: Precios y Costos
-        p_frame = self.crear_seccion_frame()
-        p_layout = QGridLayout(p_frame)
-
-        p_layout.addWidget(QLabel("Costo Lista:"), 0, 0)
+        # Fila 2
+        g_layout.addWidget(QLabel("Costo:"), 2, 0)
         self.txt_costo_lista = NumericLineEdit("0.00")
-        p_layout.addWidget(self.txt_costo_lista, 0, 1)
+        g_layout.addWidget(self.txt_costo_lista, 2, 1)
 
-        p_layout.addWidget(QLabel("Flete/Varios:"), 0, 2)
+        g_layout.addWidget(QLabel("Flete:"), 2, 2)
         self.txt_flete = NumericLineEdit("0.00")
-        p_layout.addWidget(self.txt_flete, 0, 3)
+        g_layout.addWidget(self.txt_flete, 2, 3)
 
-        p_layout.addWidget(QLabel("Utilidad (%):"), 1, 0)
+        g_layout.addWidget(QLabel("Utilidad (%):"), 2, 4)
         self.txt_utilidad = NumericLineEdit("0.00")
-        p_layout.addWidget(self.txt_utilidad, 1, 1)
+        g_layout.addWidget(self.txt_utilidad, 2, 5)
 
-        p_layout.addWidget(QLabel("Precio:"), 1, 2)
+        # Fila 3
+        g_layout.addWidget(QLabel("Precio Venta:"), 3, 0)
         self.txt_precio_contado = NumericLineEdit("0.00")
-        self.txt_precio_contado
-        p_layout.addWidget(self.txt_precio_contado, 1, 3)
-        
-        # Ocultamos la referencia a precio_tarjeta para no romper lógica de guardar/cargar
+        g_layout.addWidget(self.txt_precio_contado, 3, 1)
+
+        g_layout.addWidget(QLabel("Stock Actual:"), 3, 2)
+        self.txt_stock_actual = NumericLineEdit("0")
+        g_layout.addWidget(self.txt_stock_actual, 3, 3)
+
+        g_layout.addWidget(QLabel("Stock Mín / Máx:"), 3, 4)
+        min_max_layout = QHBoxLayout()
+        min_max_layout.setContentsMargins(0, 0, 0, 0)
+        min_max_layout.setSpacing(5)
+        self.txt_stock_min = NumericLineEdit("5")
+        self.txt_stock_max = NumericLineEdit("100")
+        min_max_layout.addWidget(self.txt_stock_min)
+        min_max_layout.addWidget(self.txt_stock_max)
+        g_layout.addLayout(min_max_layout, 3, 5)
+
+        # Ocultos
         self.txt_precio_tarjeta = NumericLineEdit("0.00")
         self.txt_precio_tarjeta.setVisible(False)
+        self.txt_ubicacion = QLineEdit("")
+        self.txt_ubicacion.setVisible(False)
+        self.lbl_creado_por = QLabel("-")
+        self.lbl_creado_por.setVisible(False)
+        self.lbl_modificado_por = QLabel("-")
+        self.lbl_modificado_por.setVisible(False)
 
-        form_layout.addWidget(p_frame)
+        form_layout.addWidget(g_frame)
 
         # Conectar señales para cálculos dinámicos
         self.txt_costo_lista.textEdited.connect(self.calcular_precios_desde_costo)
         self.txt_flete.textEdited.connect(self.calcular_precios_desde_costo)
         self.txt_utilidad.textEdited.connect(self.calcular_precios_desde_costo)
         self.txt_precio_contado.textEdited.connect(self.calcular_utilidad_desde_precio)
-
-        # Bloque 3: Stock y Observaciones
-        s_frame = self.crear_seccion_frame()
-        s_layout = QGridLayout(s_frame)
-
-        s_layout.addWidget(QLabel("Stock Mínimo:"), 0, 0)
-        self.txt_stock_min = NumericLineEdit("5")
-        s_layout.addWidget(self.txt_stock_min, 0, 1)
-
-        s_layout.addWidget(QLabel("Stock Actual:"), 0, 2)
-        self.txt_stock_actual = NumericLineEdit("0")
-        s_layout.addWidget(self.txt_stock_actual, 0, 3)
-
-        s_layout.addWidget(QLabel("Stock Máximo:"), 1, 0)
-        self.txt_stock_max = NumericLineEdit("100")
-        s_layout.addWidget(self.txt_stock_max, 1, 1)
-
-        s_layout.addWidget(QLabel("Ubicación:"), 1, 2)
-        self.txt_ubicacion = QLineEdit("")
-        s_layout.addWidget(self.txt_ubicacion, 1, 3)
-
-        s_layout.addWidget(QLabel("Talle (Opcional):"), 2, 0)
-        self.txt_talle = QLineEdit("")
-        s_layout.addWidget(self.txt_talle, 2, 1)
-
-        s_layout.addWidget(QLabel("Creado por:"), 3, 0)
-        self.lbl_creado_por = QLabel("-")
-        self.lbl_creado_por.setStyleSheet("color: #7A7067; font-style: italic;")
-        s_layout.addWidget(self.lbl_creado_por, 3, 1)
-
-        s_layout.addWidget(QLabel("Modificado por:"), 3, 2)
-        self.lbl_modificado_por = QLabel("-")
-        self.lbl_modificado_por.setStyleSheet("color: #7A7067; font-style: italic;")
-        s_layout.addWidget(self.lbl_modificado_por, 3, 3)
- 
-        form_layout.addWidget(s_frame)
 
         # --- BOTONES DE ACCIÓN ---
         btn_layout = QHBoxLayout()
@@ -265,7 +254,7 @@ class ProductosView(QWidget):
         grid_layout.setContentsMargins(0,0,0,0)
 
         search_layout = QHBoxLayout()
-        search_layout.addWidget(QLabel("Búsqueda Rápida:"))
+        search_layout.addWidget(QLabel("Búsqueda:"))
         self.txt_buscar = QLineEdit()
         self.txt_buscar
         self.txt_buscar.setPlaceholderText("Nombre, Código o ID...")
@@ -297,7 +286,7 @@ class ProductosView(QWidget):
         self.tabla.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.tabla.verticalHeader().setVisible(False)
+        self.tabla.verticalHeader().setVisible(True)
         self.tabla.verticalHeader().setDefaultSectionSize(40)
         self.tabla.cellDoubleClicked.connect(self.cargar_producto_para_edicion)
         grid_layout.addWidget(self.tabla)
