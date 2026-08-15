@@ -7,8 +7,8 @@ def crear_acceso_directo():
         from win32com.client import Dispatch
 
         desktop = winshell.desktop()
-        path = os.path.join(desktop, "Albina Accesorios.lnk")
-        target = r"C:\Users\CS\OneDrive\Escritorio\¿\AlbinaNuevo\dist\AlbinaAccesorios.exe"
+        path = os.path.join(desktop, "Albina POS - San Martin.lnk")
+        target = r"C:\Users\CS\OneDrive\Escritorio\¿\AlbinaNuevo\dist\AlbinaPOS_SanMartin.exe"
         icon = r"C:\Users\CS\OneDrive\Escritorio\¿\AlbinaNuevo\logo-albina.ico"
 
         shell = Dispatch('WScript.Shell')

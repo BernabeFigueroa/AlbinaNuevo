@@ -1,4 +1,4 @@
-﻿name: Build and Release
+name: Build and Release
 
 on:
   push:
@@ -35,7 +35,7 @@ jobs:
       - name: Publicar Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/AlbinaAccesorios.exe
+          files: dist/AlbinaPOS_SanMartin.exe
           name: Versión ${{ github.ref_name }}
           body: |
             ## Novedades

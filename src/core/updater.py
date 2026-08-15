@@ -7,8 +7,8 @@ from packaging import version
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout, QMessageBox, QApplication
 
-CURRENT_VERSION = "1.0.5"
-GITHUB_REPO = "BernabeFigueroa/albina-pos-releases"  # Repositorio público exclusivo para releases/binarios
+CURRENT_VERSION = "1.0.6"
+GITHUB_REPO = "BernabeFigueroa/AlbinaNuevo"  # Repositorio oficial para releases/binarios
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
 class UpdateCheckerThread(QThread):
@@ -37,7 +37,7 @@ class UpdateCheckerThread(QThread):
                         exe_size = 0
                         
                         # Determinar el nombre exacto del ejecutable en ejecución (ej: AlbinaPOS_Italia.exe o AlbinaAccesorios.exe)
-                        current_exe_name = os.path.basename(sys.executable).lower() if getattr(sys, 'frozen', False) else "albinaaccesorios.exe"
+                        current_exe_name = os.path.basename(sys.executable).lower() if getattr(sys, 'frozen', False) else "albinapos_sanmartin.exe"
                         
                         assets = data.get("assets", [])
                         # 1. Buscar coincidencia exacta por nombre
@@ -185,7 +185,7 @@ class UpdateDialog(QDialog):
         import tempfile
         # Usar directorio temporal del usuario con permisos de escritura garantizados
         temp_dir = tempfile.gettempdir()
-        new_exe_path = os.path.join(temp_dir, "AlbinaAccesorios_update.exe")
+        new_exe_path = os.path.join(temp_dir, "AlbinaPOS_SanMartin_update.exe")
 
         self.worker = DownloadWorkerThread(self.release_info["download_url"], new_exe_path)
         self.worker.progress.connect(self.progress_bar.setValue)
