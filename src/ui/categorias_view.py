@@ -23,18 +23,16 @@ class CategoriasView(QWidget):
         lbl_titulo.setStyleSheet("color: #000000; margin-bottom: 10px;")
         layout.addWidget(lbl_titulo)
 
-        splitter = QSplitter(Qt.Orientation.Vertical)
-        layout.addWidget(splitter)
-
         # --- FORMULARIO ---
         form_widget = QFrame()
-        form_widget.setStyleSheet("QFrame { background-color: #FFFFFF; border: 1px solid #E5DFD5; border-radius: 8px; border-radius: 8px; } QLabel { font-weight: bold; } ")
+        form_widget.setStyleSheet("QFrame { background-color: #FFFFFF; border: 1px solid #E5DFD5; border-radius: 12px; } QLabel { font-weight: 500; }")
         form_layout = QVBoxLayout(form_widget)
+        form_layout.setContentsMargins(15, 15, 15, 15)
+        form_layout.setSpacing(10)
         
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("Nombre del Rubro:"))
         self.txt_nombre = QLineEdit()
-        self.txt_nombre
         row1.addWidget(self.txt_nombre)
         form_layout.addLayout(row1)
 
@@ -46,13 +44,11 @@ class CategoriasView(QWidget):
         
         self.btn_eliminar = QPushButton("Eliminar")
         self.btn_eliminar.setObjectName("btn_danger")
-
         self.btn_eliminar.clicked.connect(self.eliminar)
         self.btn_eliminar.setEnabled(False)
         
         self.btn_guardar = QPushButton("Guardar")
         self.btn_guardar.setObjectName("btn_primary")
-
         self.btn_guardar.clicked.connect(self.guardar)
 
         btn_layout.addWidget(self.btn_limpiar)
@@ -61,7 +57,7 @@ class CategoriasView(QWidget):
         btn_layout.addWidget(self.btn_guardar)
         form_layout.addLayout(btn_layout)
         
-        splitter.addWidget(form_widget)
+        layout.addWidget(form_widget)
 
         # --- GRILLA ---
         grid_widget = QWidget()
@@ -69,7 +65,6 @@ class CategoriasView(QWidget):
         grid_layout.setContentsMargins(0, 10, 0, 0)
         
         self.tabla = QTableWidget(0, 2)
-
         self.tabla.setHorizontalHeaderLabels(["ID", "Nombre Categoría"])
         self.tabla.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -77,7 +72,7 @@ class CategoriasView(QWidget):
         self.tabla.cellDoubleClicked.connect(self.seleccionar)
         grid_layout.addWidget(self.tabla)
         
-        splitter.addWidget(grid_widget)
+        layout.addWidget(grid_widget, 1)
 
     def cargar_grilla(self):
         self.tabla.setRowCount(0)

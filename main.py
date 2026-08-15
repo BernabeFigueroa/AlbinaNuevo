@@ -24,9 +24,39 @@ def main():
     # Resuelve de raíz los problemas de visualización e inconsistencias de botones y flechas
     albina_style = """
     /* Fondo General de Ventas */
-    QMainWindow, QDialog, QStackedWidget {
+    QMainWindow, QDialog, QStackedWidget, QMessageBox {
         background-color: #FAF8F5;
         color: #2C2520;
+    }
+
+    /* Diálogos y Modales (QMessageBox, QDialog, QInputDialog) */
+    QMessageBox {
+        background-color: #FAF8F5;
+        color: #2C2520;
+    }
+    QMessageBox QLabel {
+        color: #2C2520;
+        font-size: 13px;
+        font-weight: 500;
+        background-color: transparent;
+        min-height: 40px;
+    }
+    QMessageBox QPushButton {
+        min-width: 80px;
+        min-height: 30px;
+        padding: 4px 14px;
+        font-size: 12px;
+        border-radius: 6px;
+    }
+    QDialog QLabel {
+        color: #2C2520;
+    }
+    
+    /* Separador invisible para que no dibuje una barra negra gruesa */
+    QSplitter::handle {
+        background-color: transparent;
+        height: 10px;
+        width: 10px;
     }
     
     /* Paneles / Tarjetas Flotantes */

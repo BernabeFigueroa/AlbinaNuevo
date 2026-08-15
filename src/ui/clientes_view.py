@@ -23,45 +23,43 @@ class ClientesView(QWidget):
         lbl_titulo.setStyleSheet("color: #000000; margin-bottom: 10px;")
         layout.addWidget(lbl_titulo)
 
-        splitter = QSplitter(Qt.Orientation.Vertical)
-        layout.addWidget(splitter)
-
         # --- FORMULARIO ---
         form_widget = QFrame()
-        form_widget.setStyleSheet("QFrame { background-color: #FFFFFF; border: 1px solid #E5DFD5; border-radius: 8px; border-radius: 8px; } QLabel { font-weight: bold; } QLineEdit, ")
+        form_widget.setStyleSheet("QFrame { background-color: #FFFFFF; border: 1px solid #E5DFD5; border-radius: 12px; } QLabel { font-weight: 500; }")
         form_layout = QVBoxLayout(form_widget)
+        form_layout.setContentsMargins(15, 15, 15, 15)
+        form_layout.setSpacing(10)
         
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("Nombre/Razón Social:"))
         self.txt_nombre = QLineEdit()
-        self.txt_nombre
         row1.addWidget(self.txt_nombre)
         row1.addWidget(QLabel("DNI/CUIT:"))
         self.txt_cuit = QLineEdit()
-        self.txt_cuit
         row1.addWidget(self.txt_cuit)
         form_layout.addLayout(row1)
 
         row2 = QHBoxLayout()
         row2.addWidget(QLabel("Teléfono:"))
         self.txt_telefono = QLineEdit()
-        self.txt_telefono
         row2.addWidget(self.txt_telefono)
         row2.addWidget(QLabel("Domicilio:"))
         self.txt_domicilio = QLineEdit()
-        self.txt_domicilio
         row2.addWidget(self.txt_domicilio)
         form_layout.addLayout(row2)
 
         row3 = QHBoxLayout()
         row3.addWidget(QLabel("Condición IVA:"))
         self.cb_iva = QComboBox()
-
         self.cb_iva.addItems(["Consumidor Final", "Responsable Inscripto", "Monotributo", "Exento"])
         row3.addWidget(self.cb_iva)
         
+        row3.addWidget(QLabel("Límite Cta Cte ($):"))
+        self.txt_limite = QLineEdit("0.00")
+        row3.addWidget(self.txt_limite)
+
         row3.addWidget(QLabel("Descuento Fijo (%):"))
-        self.txt_descuento = QLineEdit("0.0")
+        self.txt_descuento = QLineEdit("0")
         row3.addWidget(self.txt_descuento)
         form_layout.addLayout(row3)
 
@@ -73,13 +71,11 @@ class ClientesView(QWidget):
         
         self.btn_eliminar = QPushButton("Dar de Baja")
         self.btn_eliminar.setObjectName("btn_danger")
-
         self.btn_eliminar.clicked.connect(self.eliminar)
         self.btn_eliminar.setEnabled(False)
         
         self.btn_guardar = QPushButton("Guardar")
         self.btn_guardar.setObjectName("btn_primary")
-
         self.btn_guardar.clicked.connect(self.guardar)
 
         btn_layout.addWidget(self.btn_limpiar)
@@ -88,23 +84,22 @@ class ClientesView(QWidget):
         btn_layout.addWidget(self.btn_guardar)
         form_layout.addLayout(btn_layout)
         
-        splitter.addWidget(form_widget)
+        layout.addWidget(form_widget)
 
         # --- GRILLA ---
         grid_widget = QWidget()
         grid_layout = QVBoxLayout(grid_widget)
         grid_layout.setContentsMargins(0, 10, 0, 0)
         
-        self.tabla = QTableWidget(0, 5)
-
-        self.tabla.setHorizontalHeaderLabels(["ID", "Nombre", "DNI/CUIT", "Teléfono", "Descuento"])
+        self.tabla = QTableWidget(0, 7)
+        self.tabla.setHorizontalHeaderLabels(["ID", "Nombre", "CUIT/DNI", "Teléfono", "Domicilio", "Límite", "Desc (%)"])
         self.tabla.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.cellDoubleClicked.connect(self.seleccionar)
         grid_layout.addWidget(self.tabla)
         
-        splitter.addWidget(grid_widget)
+        layout.addWidget(grid_widget, 1)
 
     def cargar_grilla(self):
         self.tabla.setRowCount(0)
