@@ -207,8 +207,8 @@ class UpdateDialog(QDialog):
 
 def apply_update_and_restart(new_exe_path):
     """
-    Crea un batch script en TEMP que espera que cierre la app actual,
-    reemplaza el .exe viejo por el nuevo (manejando permisos) y vuelve a abrirlo.
+    Ejecuta el reemplazo atómico del ejecutable y vuelve a iniciar la app.
+    Maneja procesos en ejecución y permisos en carpetas del sistema.
     """
     if not getattr(sys, 'frozen', False):
         QMessageBox.information(None, "Modo Desarrollo", f"Descargado con éxito en:\n{new_exe_path}\n(En modo ejecutable se aplica el reemplazo automático y reinicio)")
@@ -216,34 +216,61 @@ def apply_update_and_restart(new_exe_path):
 
     import tempfile
     current_exe = sys.executable
+    pid = os.getpid()
     temp_dir = tempfile.gettempdir()
-    updater_bat = os.path.join(temp_dir, "update_albina.bat")
+    updater_ps1 = os.path.join(temp_dir, "update_albina.ps1")
+    updater_vbs = os.path.join(temp_dir, "launch_update.vbs")
 
-    bat_content = f"""@echo off
-chcp 65001 > nul
-timeout /t 2 /nobreak > nul
-:retry
-del "{current_exe}" > nul 2>&1
-if exist "{current_exe}" (
-    timeout /t 1 /nobreak > nul
-    goto retry
-)
-copy /y "{new_exe_path}" "{current_exe}" > nul 2>&1
-if not exist "{current_exe}" (
-    move /y "{new_exe_path}" "{current_exe}" > nul 2>&1
-)
-del "{new_exe_path}" > nul 2>&1
-start "" "{current_exe}"
-del "%~f0" > nul 2>&1
-exit
+    # Script en PowerShell que espera el cierre del PID, reemplaza el binario y lo vuelve a lanzar
+    ps_content = f"""
+$currentExe = "{current_exe}"
+$newExe = "{new_exe_path}"
+$pidToWait = {pid}
+
+# 1. Esperar a que el proceso principal termine
+try {{
+    $proc = Get-Process -Id $pidToWait -ErrorAction SilentlyContinue
+    if ($proc) {{
+        $proc.WaitForExit(8000)
+    }}
+}} catch {{}}
+
+Start-Sleep -Seconds 1
+
+# 2. Intentar reemplazar el archivo hasta 10 veces
+$replaced = $false
+for ($i = 0; $i -lt 10; $i++) {{
+    try {{
+        Copy-Item -Path $newExe -Destination $currentExe -Force -ErrorAction Stop
+        $replaced = $true
+        break
+    }} catch {{
+        Start-Sleep -Seconds 1
+    }}
+}}
+
+# 3. Si se reemplazó, borrar temporal e iniciar la nueva versión
+if (Test-Path $newExe) {{
+    Remove-Item -Path $newExe -Force -ErrorAction SilentlyContinue
+}}
+
+Start-Process -FilePath $currentExe
+"""
+
+    # VBScript para ejecutar PowerShell de forma completamente invisible y sin ventana negra
+    vbs_content = f"""Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run "powershell.exe -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File ""{updater_ps1}""", 0, False
 """
 
     try:
-        with open(updater_bat, "w", encoding="utf-8") as f:
-            f.write(bat_content)
-        subprocess.Popen(["cmd.exe", "/c", updater_bat], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+        with open(updater_ps1, "w", encoding="utf-8") as f:
+            f.write(ps_content)
+        with open(updater_vbs, "w", encoding="utf-8") as f:
+            f.write(vbs_content)
+
+        subprocess.Popen(["wscript.exe", updater_vbs])
     except Exception as e:
-        print(f"Error lanzando updater batch: {e}")
+        print(f"Error lanzando updater: {e}")
 
     QApplication.quit()
     sys.exit(0)
