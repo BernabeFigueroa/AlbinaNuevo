@@ -169,42 +169,102 @@ class DeudoresView(QWidget):
 class PagoDialog(QDialog):
     def __init__(self, saldo, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Registrar Pago")
-        self.setFixedSize(300, 200)
-        self.setStyleSheet("QDialog { background-color: #7A7067; color: #000000; } QLabel { color: #000000; }")
+        self.setWindowTitle("Registrar Pago de Cliente")
+        self.setFixedSize(380, 310)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #FAF8F5;
+                color: #2C2520;
+            }
+            QLabel {
+                color: #2C2520;
+                font-size: 13px;
+                font-weight: 500;
+            }
+            QDoubleSpinBox, QComboBox {
+                background-color: #FFFFFF;
+                color: #2C2520;
+                border: 1px solid #ACA096;
+                border-radius: 8px;
+                padding: 6px 10px;
+                font-size: 14px;
+                min-height: 32px;
+            }
+            QDoubleSpinBox:focus, QComboBox:focus {
+                border: 1px solid #B09886;
+            }
+            QPushButton {
+                min-height: 32px;
+                padding: 6px 16px;
+                font-size: 12px;
+                font-weight: bold;
+                border-radius: 6px;
+            }
+        """)
         
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(14)
         
-        lbl_saldo = QLabel(f"Saldo Total: ${saldo:.2f}")
-        lbl_saldo.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
-        layout.addWidget(lbl_saldo)
+        # Tarjeta de saldo destacado
+        saldo_card = QFrame()
+        saldo_card.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border: 1px solid #E5DFD5;
+                border-radius: 10px;
+                padding: 10px;
+            }
+        """)
+        card_layout = QVBoxLayout(saldo_card)
+        card_layout.setContentsMargins(12, 10, 12, 10)
+        card_layout.setSpacing(4)
         
-        layout.addWidget(QLabel("Monto (Abono o Saldo a Favor):"))
+        lbl_saldo_sub = QLabel("Saldo Total Pendiente:")
+        lbl_saldo_sub.setStyleSheet("font-size: 11px; color: #7A7067; font-weight: normal;")
+        
+        lbl_saldo = QLabel(f"${saldo:.2f}")
+        lbl_saldo.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        lbl_saldo.setStyleSheet("color: #D99890;") if saldo > 0 else lbl_saldo.setStyleSheet("color: #B09886;")
+        
+        card_layout.addWidget(lbl_saldo_sub)
+        card_layout.addWidget(lbl_saldo)
+        layout.addWidget(saldo_card)
+        
+        # Campo Monto
+        layout.addWidget(QLabel("Monto a Abonar / Saldo a Favor:"))
         self.spin_monto = QDoubleSpinBox()
-        self.spin_monto.setRange(0.01, 10000000.0) # Permitir monto libre, no limitado al saldo
+        self.spin_monto.setRange(0.01, 10000000.0)
         self.spin_monto.setValue(saldo if saldo > 0 else 0.0)
         self.spin_monto.setDecimals(2)
-        self.spin_monto
+        self.spin_monto.setPrefix("$ ")
         layout.addWidget(self.spin_monto)
         
-        layout.addWidget(QLabel("Método / Tipo:"))
+        # Campo Método
+        layout.addWidget(QLabel("Método / Tipo de Cobro:"))
         self.cb_metodo = QComboBox()
-
         self.cb_metodo.addItems(["EFECTIVO", "TRANSFERENCIA", "CANJE / MERCADERIA"])
-
         layout.addWidget(self.cb_metodo)
         
+        layout.addStretch()
+        
+        # Botones
         btn_layout = QHBoxLayout()
-        btn_aceptar = QPushButton("Aceptar")
-        btn_aceptar
-        btn_aceptar.clicked.connect(self.accept)
+        btn_layout.setSpacing(10)
         
         btn_cancelar = QPushButton("Cancelar")
-        btn_cancelar
+        btn_cancelar.setObjectName("btn_neutral")
+        btn_cancelar.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_cancelar.clicked.connect(self.reject)
         
-        btn_layout.addWidget(btn_aceptar)
+        btn_aceptar = QPushButton("Registrar Cobro")
+        btn_aceptar.setObjectName("btn_primary")
+        btn_aceptar.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_aceptar.clicked.connect(self.accept)
+        
+        btn_layout.addStretch()
         btn_layout.addWidget(btn_cancelar)
+        btn_layout.addWidget(btn_aceptar)
         layout.addLayout(btn_layout)
 
     def get_data(self):
