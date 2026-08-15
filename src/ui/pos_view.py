@@ -404,9 +404,9 @@ class POSView(QWidget):
             self.txt_codigo.clear()
             return
 
-        # Obtener precio según medio de pago
+        # Obtener precio de lista (tarjeta) como precio base sobre el que aplican los descuentos
         try:
-            precio_a_cobrar = float(producto.get('precio_contado') or 0.0)
+            precio_a_cobrar = float(producto.get('precio_tarjeta') or producto.get('precio_contado') or 0.0)
         except (ValueError, TypeError):
             precio_a_cobrar = 0.0
         

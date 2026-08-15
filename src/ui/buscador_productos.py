@@ -133,7 +133,7 @@ class BuscadorProductosDialog(QDialog):
             self.tabla.setItem(row_idx, 2, QTableWidgetItem(p['nombre']))
             self.tabla.setItem(row_idx, 3, QTableWidgetItem(p.get('talle') or ""))
             try:
-                precio_val = float(p.get('precio_contado') or 0.0)
+                precio_val = float(p.get('precio_tarjeta') or p.get('precio_contado') or 0.0)
             except (ValueError, TypeError):
                 precio_val = 0.0
             self.tabla.setItem(row_idx, 4, QTableWidgetItem(f"${precio_val:.2f}"))
