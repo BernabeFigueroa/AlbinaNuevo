@@ -113,15 +113,16 @@ class POSView(QWidget):
         header_layout.addWidget(QLabel("Código Cliente:"), 1, 0)
         
         cliente_input_layout = QHBoxLayout()
+        cliente_input_layout.setContentsMargins(0, 0, 0, 0)
+        cliente_input_layout.setSpacing(5)
         self.txt_cod_cliente = QLineEdit("1")
         self.txt_cod_cliente.setFixedWidth(80)
         self.txt_cod_cliente.returnPressed.connect(self.buscar_cliente)
         cliente_input_layout.addWidget(self.txt_cod_cliente)
         
-        self.btn_buscar_cliente = QPushButton("(F3)")
+        self.btn_buscar_cliente = QPushButton("Buscar (F3)")
         self.btn_buscar_cliente.setObjectName("btn_primary")
 
-        self.btn_buscar_cliente.setFixedWidth(50)
         self.btn_buscar_cliente.clicked.connect(self.abrir_buscador_clientes_f3)
         cliente_input_layout.addWidget(self.btn_buscar_cliente)
         

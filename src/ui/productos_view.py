@@ -100,8 +100,6 @@ class ProductosView(QWidget):
         lbl_titulo.setStyleSheet("color: #000000;")
         layout_principal.addWidget(lbl_titulo)
 
-        splitter = QSplitter(Qt.Orientation.Vertical)
-
         # --- PANEL SUPERIOR: FORMULARIO ---
         form_widget = QWidget()
         form_layout = QVBoxLayout(form_widget)
@@ -259,7 +257,7 @@ class ProductosView(QWidget):
 
         form_layout.addLayout(btn_layout)
         
-        splitter.addWidget(form_widget)
+        layout_principal.addWidget(form_widget)
 
         # --- PANEL INFERIOR: GRILLA ---
         grid_widget = QWidget()
@@ -299,11 +297,12 @@ class ProductosView(QWidget):
         self.tabla.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.tabla.verticalHeader().setVisible(False)
+        self.tabla.verticalHeader().setDefaultSectionSize(40)
         self.tabla.cellDoubleClicked.connect(self.cargar_producto_para_edicion)
         grid_layout.addWidget(self.tabla)
 
-        splitter.addWidget(grid_widget)
-        layout_principal.addWidget(splitter)
+        layout_principal.addWidget(grid_widget, 1)
 
     def calcular_precios_desde_costo(self, text=""):
         try:

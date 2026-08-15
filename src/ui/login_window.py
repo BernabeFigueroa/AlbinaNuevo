@@ -10,8 +10,9 @@ class LoginWindow(QWidget):
         self.setWindowTitle("Albina Accesorios - Ingreso")
         self.resize(400, 500)
         self.setup_ui()
-        
     def setup_ui(self):
+        self.setObjectName("LoginWindow")
+        self.setStyleSheet("#LoginWindow { background-color: #FAF8F5; }")
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.setSpacing(20)
