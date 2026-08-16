@@ -1,6 +1,7 @@
 from src.db.database import get_supabase
 from src.core.caja_manager import CajaManager
 from src.core.auth_manager import AuthManager
+from src.core.cache_manager import DataCache
 
 class VentasManager:
     @staticmethod
@@ -102,6 +103,9 @@ class VentasManager:
                 'detalle': f"Venta Fiada #{venta_id}"
             }
             supabase.table('cta_cte_movimientos').insert(cta_data).execute()
+
+        # 4. Invalidar caché de productos para que la grilla refleje el stock actualizado
+        DataCache.invalidate_productos()
 
         return {
             "venta_id": venta_id,

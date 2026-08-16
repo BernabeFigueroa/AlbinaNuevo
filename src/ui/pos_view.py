@@ -159,48 +159,48 @@ class POSView(QWidget):
         self.tabla_carrito = QTableWidget(0, 6)
         self.tabla_carrito.setHorizontalHeaderLabels(["Código", "Descripción", "Talle", "Cantidad", "P. Unitario", "Importe"])
         self.tabla_carrito.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.tabla_carrito.setFont(QFont("Segoe UI", 11))
+        self.tabla_carrito.setFont(QFont("Segoe UI", 10))
         self.tabla_carrito.verticalHeader().setVisible(False)
-        self.tabla_carrito.verticalHeader().setDefaultSectionSize(34)
+        self.tabla_carrito.verticalHeader().setDefaultSectionSize(28)
         self.tabla_carrito.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla_carrito.itemChanged.connect(self.al_cambiar_celda)
-        self.tabla_carrito.setMinimumHeight(200)
+        self.tabla_carrito.setMinimumHeight(100)
         layout_principal.addWidget(self.tabla_carrito, 1)
 
         # --- 4. PANEL INFERIOR RESPONSIVO (TOTALES Y ACCIONES) ---
         bottom_frame = self.crear_seccion_frame()
         bottom_layout = QHBoxLayout(bottom_frame)
-        bottom_layout.setContentsMargins(15, 8, 15, 8)
-        bottom_layout.setSpacing(15)
+        bottom_layout.setContentsMargins(12, 6, 12, 6)
+        bottom_layout.setSpacing(10)
 
         # Info y atajos
         info_layout = QVBoxLayout()
-        info_layout.setSpacing(2)
+        info_layout.setSpacing(1)
         lbl_vend = QLabel("Vendedor: 01 - Principal")
-        lbl_vend.setStyleSheet("font-weight: bold; color: #2C2520; font-size: 12px;")
+        lbl_vend.setStyleSheet("font-weight: bold; color: #2C2520; font-size: 11px;")
         info_layout.addWidget(lbl_vend)
         lbl_shortcuts = QLabel("[F5] Cobrar | [F12] Cancelar | [Supr] Borrar")
-        lbl_shortcuts.setStyleSheet("color: #7A7067; font-size: 11px;")
+        lbl_shortcuts.setStyleSheet("color: #7A7067; font-size: 10px;")
         info_layout.addWidget(lbl_shortcuts)
         bottom_layout.addLayout(info_layout)
 
         # Botones de Acción
         btn_action_layout = QHBoxLayout()
-        btn_action_layout.setSpacing(8)
+        btn_action_layout.setSpacing(6)
 
         self.btn_cobrar = QPushButton("COBRAR (F5)")
         self.btn_cobrar.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_cobrar.setFixedHeight(44)
-        self.btn_cobrar.setMinimumWidth(125)
+        self.btn_cobrar.setFixedHeight(38)
+        self.btn_cobrar.setMinimumWidth(115)
         self.btn_cobrar.setStyleSheet("""
             QPushButton { 
                 background-color: #B09886; 
                 color: #FFFFFF; 
                 font-weight: bold; 
-                font-size: 13px; 
-                border-radius: 8px; 
+                font-size: 12px; 
+                border-radius: 6px; 
                 border: none;
-                padding: 0 12px;
+                padding: 0 10px;
             }
             QPushButton:hover { background-color: #9C8573; }
         """)
@@ -208,17 +208,17 @@ class POSView(QWidget):
 
         self.btn_cancelar = QPushButton("CANCELAR (F12)")
         self.btn_cancelar.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_cancelar.setFixedHeight(44)
-        self.btn_cancelar.setMinimumWidth(130)
+        self.btn_cancelar.setFixedHeight(38)
+        self.btn_cancelar.setMinimumWidth(115)
         self.btn_cancelar.setStyleSheet("""
             QPushButton { 
                 background-color: #D99890; 
                 color: #FFFFFF; 
                 font-weight: bold; 
-                font-size: 13px; 
-                border-radius: 8px; 
+                font-size: 12px; 
+                border-radius: 6px; 
                 border: none;
-                padding: 0 12px;
+                padding: 0 10px;
             }
             QPushButton:hover { background-color: #C5847C; }
         """)
@@ -230,15 +230,15 @@ class POSView(QWidget):
 
         # Selector de Medio de Pago
         pago_layout = QVBoxLayout()
-        pago_layout.setSpacing(2)
+        pago_layout.setSpacing(1)
         lbl_mp = QLabel("Medio de Pago:")
-        lbl_mp.setStyleSheet("font-size: 11px; font-weight: bold; color: #2C2520;")
+        lbl_mp.setStyleSheet("font-size: 10px; font-weight: bold; color: #2C2520;")
         pago_layout.addWidget(lbl_mp)
         self.cb_medio_pago = QComboBox()
         self.cb_medio_pago.addItems(["EFECTIVO", "TRANSFERENCIA", "TARJETA", "MIXTO", "FIADO / CTA. CTE."])
-        self.cb_medio_pago.setStyleSheet("font-size: 12px; font-weight: bold; padding: 3px 6px;")
-        self.cb_medio_pago.setFixedHeight(32)
-        self.cb_medio_pago.setMinimumWidth(135)
+        self.cb_medio_pago.setStyleSheet("font-size: 11px; font-weight: bold; padding: 2px 4px;")
+        self.cb_medio_pago.setFixedHeight(28)
+        self.cb_medio_pago.setMinimumWidth(125)
         self.cb_medio_pago.currentIndexChanged.connect(self.actualizar_tabla)
         pago_layout.addWidget(self.cb_medio_pago)
         pago_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
@@ -256,7 +256,7 @@ class POSView(QWidget):
         self.lbl_descuento.setStyleSheet("color: #D99890; font-weight: 500;")
         
         self.lbl_total = QLabel("$0.00")
-        self.lbl_total.setFont(QFont("Segoe UI", 26, QFont.Weight.Bold))
+        self.lbl_total.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
         self.lbl_total.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.lbl_total.setStyleSheet("color: #000000; padding: 0px 2px;")
         

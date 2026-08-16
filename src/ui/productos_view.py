@@ -366,13 +366,13 @@ class ProductosView(QWidget):
         except ValueError:
             pass
 
-    def cargar_grilla(self, filtro=""):
+    def cargar_grilla(self, filtro="", force_reload=False):
         try:
             from src.core.cache_manager import DataCache
             self.tabla.setUpdatesEnabled(False)
             self.tabla.setRowCount(0)
             incluir_inactivos = hasattr(self, 'chk_inactivos') and self.chk_inactivos.isChecked()
-            productos = DataCache.get_productos(incluir_inactivos=incluir_inactivos) or []
+            productos = DataCache.get_productos(incluir_inactivos=incluir_inactivos, force_reload=force_reload) or []
             
             cat_filtro = self.cb_filtro_categoria.currentData() if hasattr(self, 'cb_filtro_categoria') else None
             prov_filtro = self.cb_filtro_proveedor.currentData() if hasattr(self, 'cb_filtro_proveedor') else None
