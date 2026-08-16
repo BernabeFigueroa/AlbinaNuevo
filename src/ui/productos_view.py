@@ -308,7 +308,13 @@ class ProductosView(QWidget):
         self.tabla = QTableWidget(0, 6)
 
         self.tabla.setHorizontalHeaderLabels(["Código", "Descripción", "Talle", "P. Contado", "P. Tarjeta", "Stock"])
+        self.tabla.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.tabla.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.tabla.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.tabla.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.tabla.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self.tabla.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.verticalHeader().setVisible(True)
@@ -411,7 +417,10 @@ class ProductosView(QWidget):
                     item_nombre.setText(f"{nombre_val} (ELIMINADO)")
                     
                 self.tabla.setItem(row_idx, 1, item_nombre)
-                self.tabla.setItem(row_idx, 2, QTableWidgetItem(str(p.get('talle') or "")))
+                
+                item_talle = QTableWidgetItem(str(p.get('talle') or "-"))
+                item_talle.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.tabla.setItem(row_idx, 2, item_talle)
                 
                 # Conversión segura de precios
                 try:
@@ -420,12 +429,20 @@ class ProductosView(QWidget):
                 except (ValueError, TypeError):
                     p_cont = 0.0
                     p_tarj = 0.0
-                self.tabla.setItem(row_idx, 3, QTableWidgetItem(f"${p_cont:.2f}"))
-                self.tabla.setItem(row_idx, 4, QTableWidgetItem(f"${p_tarj:.2f}"))
+                    
+                item_p_cont = QTableWidgetItem(f"$ {p_cont:,.2f}")
+                item_p_cont.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                self.tabla.setItem(row_idx, 3, item_p_cont)
+                
+                item_p_tarj = QTableWidgetItem(f"$ {p_tarj:,.2f}")
+                item_p_tarj.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                self.tabla.setItem(row_idx, 4, item_p_tarj)
                 
                 # Conversión segura de stock
                 stock_val = p.get('stock_actual', 0)
-                self.tabla.setItem(row_idx, 5, QTableWidgetItem(str(stock_val if stock_val is not None else 0)))
+                item_stock = QTableWidgetItem(str(stock_val if stock_val is not None else 0))
+                item_stock.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.tabla.setItem(row_idx, 5, item_stock)
         except Exception as e:
             print(f"Error cargando grilla de productos: {e}")
         finally:
