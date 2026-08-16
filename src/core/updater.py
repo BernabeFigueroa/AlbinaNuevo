@@ -244,48 +244,62 @@ class UpdateDialog(QDialog):
 def apply_update_and_restart(new_exe_path):
     """
     Ejecuta el reemplazo seguro del ejecutable y vuelve a iniciar la app.
-    Maneja procesos en ejecución y permisos.
+    Maneja procesos en ejecución y permisos en Windows.
     """
     if not getattr(sys, 'frozen', False):
         QMessageBox.information(None, "Modo Desarrollo", f"Descargado con éxito en:\n{new_exe_path}\n(En modo ejecutable se aplica el reemplazo automático y reinicio)")
         return
 
     import tempfile
-    current_exe = sys.executable
+    current_exe = os.path.abspath(sys.executable)
     pid = os.getpid()
     temp_dir = tempfile.gettempdir()
     updater_bat = os.path.join(temp_dir, "update_albina.bat")
+    backup_exe = current_exe + ".old"
 
-    # Script Batch infalible compatible con todas las versiones de Windows y permisos
+    # Script Batch robusto que espera a que el proceso termine, renombra el viejo y coloca el nuevo
     bat_content = f"""@echo off
+chcp 65001 >nul
 title Actualizando Albina POS...
 echo ======================================================
 echo           ACTUALIZANDO ALBINA POS SAN MARTIN          
 echo ======================================================
 echo Por favor espere mientras se instala la nueva version...
 
-:: 1. Esperar a que el proceso anterior se cierre
+:: 1. Esperar a que el proceso actual finalice por completo
 timeout /t 2 /nobreak >nul
 taskkill /F /PID {pid} >nul 2>&1
 
-:: 2. Intentar reemplazar el archivo ejecutable
-set ATTEMPTS=0
-:RETRY
-set /a ATTEMPTS+=1
-copy /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
-if %ERRORLEVEL% equ 0 goto SUCCESS
-
-if %ATTEMPTS% lss 15 (
-    timeout /t 1 /nobreak >nul
-    goto RETRY
+:: 2. Limpiar backup previo si existiera
+if exist "{backup_exe}" (
+    del /F /Q "{backup_exe}" >nul 2>&1
 )
 
-echo No se pudo sobrescribir directamente. Intentando con permisos...
-del /F /Q "{current_exe}" >nul 2>&1
-copy /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
+:: 3. Intentar renombrar el ejecutable actual a .old (Windows permite renombrar archivos bloqueados por ejecución que están cerrándose)
+set ATTEMPTS=0
+:RETRY_MOVE
+set /a ATTEMPTS+=1
 
-:SUCCESS
-del /F /Q "{new_exe_path}" >nul 2>&1
+move /Y "{current_exe}" "{backup_exe}" >nul 2>&1
+if %ERRORLEVEL% equ 0 goto MOVE_NEW
+
+copy /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
+if %ERRORLEVEL% equ 0 goto CLEANUP
+
+if %ATTEMPTS% lss 20 (
+    timeout /t 1 /nobreak >nul
+    goto RETRY_MOVE
+)
+
+:MOVE_NEW
+move /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    copy /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
+)
+
+:CLEANUP
+if exist "{new_exe_path}" del /F /Q "{new_exe_path}" >nul 2>&1
+if exist "{backup_exe}" del /F /Q "{backup_exe}" >nul 2>&1
 
 echo Iniciando nueva version...
 start "" "{current_exe}"
@@ -299,13 +313,19 @@ exit
         with open(updater_bat, "w", encoding="utf-8") as f:
             f.write(bat_content)
 
-        # Lanzar el proceso batch independiente
+        # Lanzar el proceso batch en una nueva consola independiente para que sobreviva a la muerte del padre
+        flags = subprocess.CREATE_NEW_PROCESS_GROUP
+        if hasattr(subprocess, 'DETACHED_PROCESS'):
+            flags |= subprocess.DETACHED_PROCESS
+        
         subprocess.Popen(
             ["cmd.exe", "/c", updater_bat],
-            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS if hasattr(subprocess, 'DETACHED_PROCESS') else 0
+            creationflags=flags,
+            close_fds=True
         )
     except Exception as e:
         print(f"Error lanzando updater: {e}")
 
+    # Cerrar la aplicación Qt inmediatamente
     QApplication.quit()
     sys.exit(0)
