@@ -89,6 +89,20 @@ def main():
     }
     
     /* Personalización de Desplegables (QComboBox) - Sin línea y con flecha fina */
+    QComboBox {
+        background-color: #FFFFFF;
+        color: #2C2520;
+        border: 1px solid #ACA096;
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 13px;
+        min-height: 28px;
+    }
+    
+    QComboBox:focus {
+        border: 1px solid #B09886;
+    }
+    
     QComboBox::drop-down {
         subcontrol-origin: padding;
         subcontrol-position: top right;
@@ -104,6 +118,30 @@ def main():
         border-top: 5px solid #7A7067; /* Flecha más pequeña y fina */
         width: 0;
         height: 0;
+    }
+
+    QComboBox QAbstractItemView {
+        background-color: #FFFFFF;
+        color: #2C2520;
+        selection-background-color: #F4EFE6;
+        selection-color: #2C2520;
+        border: 1px solid #E5DFD5;
+        border-radius: 6px;
+        padding: 4px;
+        outline: none;
+    }
+
+    QComboBox QAbstractItemView::item {
+        color: #2C2520;
+        background-color: #FFFFFF;
+        min-height: 26px;
+        padding: 4px 8px;
+    }
+
+    QComboBox QAbstractItemView::item:hover,
+    QComboBox QAbstractItemView::item:selected {
+        background-color: #F4EFE6;
+        color: #000000;
     }
     
     /* Botones - Regla General (Primary) */

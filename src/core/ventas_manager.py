@@ -58,14 +58,20 @@ class VentasManager:
                     costo_unit = res_prod.data[0].get('costo_final', 0.0)
                     nuevo_stock = res_prod.data[0]['stock_actual'] - item['cantidad']
                     supabase.table('productos').update({'stock_actual': nuevo_stock}).eq('id', item['producto_id']).execute()
-                    
-            subt_item = item['cantidad'] * item['precio_unitario']
+            
+            # Determinar precio unitario efectivo cobrado según medio de pago
+            if metodo_pago in ['EFECTIVO', 'TRANSFERENCIA']:
+                p_unit_efectivo = float(item.get('precio_contado', item['precio_unitario']))
+            else:
+                p_unit_efectivo = float(item['precio_unitario'])
+                
+            subt_item = item['cantidad'] * p_unit_efectivo
             
             detalle_data = {
                 'venta_id': venta_id,
                 'producto_id': item.get('producto_id'),
                 'cantidad': item['cantidad'],
-                'precio_unitario': item['precio_unitario'],
+                'precio_unitario': p_unit_efectivo,
                 'costo_unitario': costo_unit,
                 'subtotal': subt_item
             }
