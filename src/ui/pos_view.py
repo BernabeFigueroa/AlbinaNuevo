@@ -360,6 +360,8 @@ class POSView(QWidget):
                             'nombre': "PROMO: " + promo['nombre'],
                             'cantidad': 1,
                             'precio_unitario': promo['precio_fijo'],
+                            'precio_contado': promo['precio_fijo'],
+                            'precio_tarjeta': promo['precio_fijo'],
                             'es_promo': True,
                             'detalles': promo['detalles']
                         })
@@ -389,6 +391,8 @@ class POSView(QWidget):
                     'nombre': "PROMO: " + promo_por_cb['nombre'],
                     'cantidad': 1,
                     'precio_unitario': promo_por_cb['precio_fijo'],
+                    'precio_contado': promo_por_cb['precio_fijo'],
+                    'precio_tarjeta': promo_por_cb['precio_fijo'],
                     'es_promo': True,
                     'detalles': promo_por_cb['detalles']
                 })
@@ -510,6 +514,8 @@ class POSView(QWidget):
                             'nombre': "PROMO: " + promo['nombre'],
                             'cantidad': 1,
                             'precio_unitario': promo['precio_fijo'],
+                            'precio_contado': promo['precio_fijo'],
+                            'precio_tarjeta': promo['precio_fijo'],
                             'es_promo': True,
                             'detalles': promo['detalles']
                         })
@@ -518,21 +524,34 @@ class POSView(QWidget):
     def actualizar_tabla(self):
         self._actualizando_tabla = True
         self.tabla_carrito.setRowCount(0)
-        total = 0.0
+        
+        medio_pago = self.cb_medio_pago.currentText()
+        es_contado = medio_pago in ["EFECTIVO", "TRANSFERENCIA"]
+        
+        total_lista = 0.0
+        total_efectivo_base = 0.0
+        
         for item in self.carrito:
             row_idx = self.tabla_carrito.rowCount()
             self.tabla_carrito.insertRow(row_idx)
             
-            subtotal = item['cantidad'] * item['precio_unitario']
-            total += subtotal
+            p_contado = float(item.get('precio_contado', item['precio_unitario']))
+            p_tarjeta = float(item.get('precio_tarjeta', item['precio_unitario']))
+            
+            # El precio unitario visible en la grilla cambia dinámicamente según el medio de pago elegido
+            p_unitario_actual = p_contado if es_contado else p_tarjeta
+            subtotal_item = item['cantidad'] * p_unitario_actual
+            
+            total_lista += item['cantidad'] * p_tarjeta
+            total_efectivo_base += item['cantidad'] * p_contado
 
             # Crear items
             item_cod = QTableWidgetItem(item['codigo_barras'])
             item_desc = QTableWidgetItem(item['nombre'])
             item_talle = QTableWidgetItem(item.get('talle') or "")
             item_cant = QTableWidgetItem(f"{item['cantidad']:g}")
-            item_pu = QTableWidgetItem(f"{item['precio_unitario']:.2f}")
-            item_imp = QTableWidgetItem(f"{subtotal:.2f}")
+            item_pu = QTableWidgetItem(f"{p_unitario_actual:.2f}")
+            item_imp = QTableWidgetItem(f"{subtotal_item:.2f}")
 
             # Solo la cantidad (columna 3) es editable, el resto bloqueado
             item_cod.setFlags(item_cod.flags() & ~Qt.ItemFlag.ItemIsEditable)
@@ -550,37 +569,30 @@ class POSView(QWidget):
             self.tabla_carrito.setItem(row_idx, 4, item_pu)
             self.tabla_carrito.setItem(row_idx, 5, item_imp)
 
-        medio_pago = self.cb_medio_pago.currentText()
-        
         # Si es efectivo o transferencia, el total base surge de precio_contado
-        if medio_pago in ["EFECTIVO", "TRANSFERENCIA"]:
-            total_contado = 0.0
-            for item in self.carrito:
-                p_c = item.get('precio_contado', item['precio_unitario'])
-                total_contado += item['cantidad'] * p_c
-            
+        if es_contado:
             # Aplicar descuento de cliente sobre el precio de contado si existiera
-            descuento_cliente = total_contado * (self.descuento_actual / 100.0) if self.descuento_actual > 0 else 0.0
-            total_final = total_contado - descuento_cliente
-            descuento_monto = total - total_final
+            descuento_cliente = total_efectivo_base * (self.descuento_actual / 100.0) if self.descuento_actual > 0 else 0.0
+            total_final = total_efectivo_base - descuento_cliente
+            descuento_monto = total_lista - total_final
 
             detalles_desc = [f"Desc. {medio_pago}"]
             if self.descuento_actual > 0:
                 detalles_desc.append(f"Desc. Cliente ({self.descuento_actual:.0f}%)")
             
             lbl_desc_str = " + ".join(detalles_desc)
-            self.lbl_descuento.setText(f"Precio Lista: ${total:.2f} | {lbl_desc_str}: -${descuento_monto:.2f}")
+            self.lbl_descuento.setText(f"Precio Lista: ${total_lista:.2f} | {lbl_desc_str}: -${descuento_monto:.2f}")
             self.lbl_total.setText(f"${total_final:.2f}")
         else:
             # Tarjeta, Fiado, etc. -> Precio Lista
-            descuento_cliente = total * (self.descuento_actual / 100.0) if self.descuento_actual > 0 else 0.0
-            total_final = total - descuento_cliente
+            descuento_cliente = total_lista * (self.descuento_actual / 100.0) if self.descuento_actual > 0 else 0.0
+            total_final = total_lista - descuento_cliente
             descuento_monto = descuento_cliente
             
             if self.descuento_actual > 0:
-                self.lbl_descuento.setText(f"Precio Lista: ${total:.2f} | Desc. Cliente ({self.descuento_actual:.0f}%): -${descuento_monto:.2f}")
+                self.lbl_descuento.setText(f"Precio Lista: ${total_lista:.2f} | Desc. Cliente ({self.descuento_actual:.0f}%): -${descuento_monto:.2f}")
             else:
-                self.lbl_descuento.setText(f"Precio Lista: ${total:.2f}")
+                self.lbl_descuento.setText(" ")
             self.lbl_total.setText(f"${total_final:.2f}")
 
         self._actualizando_tabla = False
