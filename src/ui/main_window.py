@@ -15,7 +15,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Albina Accesorios - Sistema de Gestión")
-        self.resize(1200, 800)
+        self.setMinimumSize(1000, 580)
+        self.resize(1200, 720)
         
         # Set Window Icon
         import os, sys
@@ -35,11 +36,11 @@ class MainWindow(QMainWindow):
 
         # --- Menú Lateral (Colores Albina) ---
         self.sidebar = QWidget()
-        self.sidebar.setFixedWidth(260)
+        self.sidebar.setFixedWidth(235)
         self.sidebar.setStyleSheet("background-color: #FFFFFF; border-right: 1px solid #E5DFD5;")
         sidebar_layout = QVBoxLayout(self.sidebar)
-        sidebar_layout.setContentsMargins(15, 25, 15, 25)
-        sidebar_layout.setSpacing(12)
+        sidebar_layout.setContentsMargins(10, 10, 10, 10)
+        sidebar_layout.setSpacing(4)
 
         # Título del menú (Logo)
         lbl_brand = QLabel()
@@ -52,14 +53,13 @@ class MainWindow(QMainWindow):
         logo_path = os.path.join(base_path, "logo-albina.png")
         pixmap = QPixmap(logo_path)
         if not pixmap.isNull():
-            lbl_brand.setPixmap(pixmap.scaled(200, 100, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+            lbl_brand.setPixmap(pixmap.scaled(180, 55, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
             lbl_brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            lbl_brand.setMinimumHeight(100)
-
-            lbl_brand.setStyleSheet("margin-bottom: 20px; border: none; background-color: transparent;")
+            lbl_brand.setMinimumHeight(55)
+            lbl_brand.setStyleSheet("margin-bottom: 6px; border: none; background-color: transparent;")
         else:
             lbl_brand.setText("ALBINA ACCESORIOS")
-            lbl_brand.setStyleSheet("font-size: 20px; font-weight: 800; color: #2C2520; margin-bottom: 20px; border: none;")
+            lbl_brand.setStyleSheet("font-size: 16px; font-weight: 800; color: #2C2520; margin-bottom: 6px; border: none;")
         
         sidebar_layout.addWidget(lbl_brand)
 
@@ -98,18 +98,19 @@ class MainWindow(QMainWindow):
         # Info usuario y Cerrar Sesión
         rol = "Admin" if AuthManager.is_admin() else "Empleada"
         lbl_user = QLabel(f"Usuario: {rol}")
-        lbl_user.setStyleSheet("color: #000000; font-weight: bold; border: none;")
+        lbl_user.setStyleSheet("color: #000000; font-weight: bold; border: none; font-size: 11px;")
         sidebar_layout.addWidget(lbl_user)
         
         btn_logout = QPushButton("Cerrar Sesión")
         btn_logout.setStyleSheet("""
             QPushButton {
                 background-color: #7A7067;
-                color: #000000;
+                color: #FFFFFF;
                 border: none;
-                padding: 10px;
+                padding: 6px;
                 border-radius: 5px;
                 font-weight: bold;
+                font-size: 12px;
             }
             QPushButton:hover { background-color: #000000; }
         """)
@@ -221,7 +222,7 @@ class MainWindow(QMainWindow):
 
     def crear_boton_menu(self, texto):
         btn = QPushButton(texto)
-        btn.setFixedHeight(50)
+        btn.setFixedHeight(38)
         btn.setCheckable(True)
         btn.setAutoExclusive(True)
         btn.setStyleSheet("""
@@ -229,11 +230,11 @@ class MainWindow(QMainWindow):
                 background-color: transparent;
                 color: #000000;
                 border: none;
-                border-radius: 8px;
-                font-size: 15px;
+                border-radius: 6px;
+                font-size: 13px;
                 font-weight: bold;
                 text-align: left;
-                padding-left: 20px;
+                padding-left: 14px;
             }
             QPushButton:hover {
                 background-color: #ACA096;

@@ -44,36 +44,35 @@ class CajaView(QWidget):
             QLabel { border: none; }
         """)
         layout = QVBoxLayout(frame)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(10)
         
         if titulo:
             lbl_titulo = QLabel(titulo)
-            lbl_titulo.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+            lbl_titulo.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
             lbl_titulo.setStyleSheet("color: #000000;")
             layout.addWidget(lbl_titulo)
             
             linea = QFrame()
             linea.setFrameShape(QFrame.Shape.HLine)
-            linea
             layout.addWidget(linea)
             
         return frame, layout
 
     def init_ui(self):
         layout_principal = QVBoxLayout(self)
-        layout_principal.setContentsMargins(30, 30, 30, 30)
-        layout_principal.setSpacing(20)
+        layout_principal.setContentsMargins(16, 12, 16, 12)
+        layout_principal.setSpacing(10)
 
         # Header
         header_layout = QHBoxLayout()
         lbl_titulo = QLabel("CAJA DIARIA")
-        lbl_titulo.setFont(QFont("Segoe UI", 24, QFont.Weight.Bold))
+        lbl_titulo.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
         lbl_titulo.setStyleSheet("color: #2C2520;")
         header_layout.addWidget(lbl_titulo)
         
         self.lbl_estado_caja = QLabel("Estado: CERRADA")
-        self.lbl_estado_caja.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        self.lbl_estado_caja.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
         self.lbl_estado_caja.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         header_layout.addWidget(self.lbl_estado_caja)
         
@@ -81,11 +80,11 @@ class CajaView(QWidget):
 
         # Main Content Layout (Split Left and Right)
         content_layout = QHBoxLayout()
-        content_layout.setSpacing(20)
+        content_layout.setSpacing(12)
 
         # --- LEFT PANEL (Apertura y Movimientos) ---
         left_panel = QVBoxLayout()
-        left_panel.setSpacing(20)
+        left_panel.setSpacing(10)
 
         # Apertura de Caja
         self.frame_apertura, apertura_layout = self.crear_tarjeta("Apertura de Turno")

@@ -16,19 +16,20 @@ class ClientesView(QWidget):
 
     def init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(8)
         
         lbl_titulo = QLabel("GESTIÓN DE CLIENTES")
-        lbl_titulo.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
-        lbl_titulo.setStyleSheet("color: #000000; margin-bottom: 10px;")
+        lbl_titulo.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        lbl_titulo.setStyleSheet("color: #000000;")
         layout.addWidget(lbl_titulo)
 
         # --- FORMULARIO ---
         form_widget = QFrame()
         form_widget.setStyleSheet("QFrame { background-color: #FFFFFF; border: 1px solid #E5DFD5; border-radius: 12px; } QLabel { font-weight: 500; }")
         form_layout = QVBoxLayout(form_widget)
-        form_layout.setContentsMargins(15, 15, 15, 15)
-        form_layout.setSpacing(10)
+        form_layout.setContentsMargins(12, 8, 12, 8)
+        form_layout.setSpacing(8)
         
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("Nombre/Razón Social:"))

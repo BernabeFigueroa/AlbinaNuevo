@@ -109,9 +109,9 @@ class ProductosView(QWidget):
         # Un solo contenedor para el formulario
         g_frame = self.crear_seccion_frame()
         g_layout = QGridLayout(g_frame)
-        g_layout.setContentsMargins(15, 15, 15, 15)
-        g_layout.setVerticalSpacing(12)
-        g_layout.setHorizontalSpacing(15)
+        g_layout.setContentsMargins(12, 8, 12, 8)
+        g_layout.setVerticalSpacing(8)
+        g_layout.setHorizontalSpacing(12)
 
         # Fila 0
         g_layout.addWidget(QLabel("Nombre:"), 0, 0)

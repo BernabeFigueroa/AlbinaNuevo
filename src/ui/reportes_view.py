@@ -75,11 +75,12 @@ class ReportesView(QWidget):
 
     def init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(8)
         
         lbl_titulo = QLabel("REPORTES Y ESTADÍSTICAS")
-        lbl_titulo.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
-        lbl_titulo.setStyleSheet("color: #000000; margin-bottom: 10px;")
+        lbl_titulo.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        lbl_titulo.setStyleSheet("color: #2C2520;")
         layout.addWidget(lbl_titulo)
 
         # --- FILTROS DE FECHA ---

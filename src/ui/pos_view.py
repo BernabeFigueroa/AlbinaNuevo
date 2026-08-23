@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox,
-    QTableWidget, QTableWidgetItem, QPushButton, QHeaderView, QMessageBox, QFrame, QGridLayout, QInputDialog, QRadioButton, QButtonGroup
+    QTableWidget, QTableWidgetItem, QPushButton, QHeaderView, QMessageBox, QFrame, QGridLayout, QInputDialog, QRadioButton, QButtonGroup, QSizePolicy
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QShortcut, QKeySequence
@@ -164,13 +164,17 @@ class POSView(QWidget):
         self.tabla_carrito.verticalHeader().setDefaultSectionSize(28)
         self.tabla_carrito.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla_carrito.itemChanged.connect(self.al_cambiar_celda)
-        self.tabla_carrito.setMinimumHeight(100)
+        self.tabla_carrito.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.tabla_carrito.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.tabla_carrito.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.tabla_carrito.setMinimumHeight(60)
         layout_principal.addWidget(self.tabla_carrito, 1)
 
         # --- 4. PANEL INFERIOR RESPONSIVO (TOTALES Y ACCIONES) ---
         bottom_frame = self.crear_seccion_frame()
+        bottom_frame.setFixedHeight(62)
         bottom_layout = QHBoxLayout(bottom_frame)
-        bottom_layout.setContentsMargins(12, 6, 12, 6)
+        bottom_layout.setContentsMargins(12, 4, 12, 4)
         bottom_layout.setSpacing(10)
 
         # Info y atajos
@@ -190,7 +194,7 @@ class POSView(QWidget):
 
         self.btn_cobrar = QPushButton("COBRAR (F5)")
         self.btn_cobrar.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_cobrar.setFixedHeight(38)
+        self.btn_cobrar.setFixedHeight(36)
         self.btn_cobrar.setMinimumWidth(115)
         self.btn_cobrar.setStyleSheet("""
             QPushButton { 
@@ -208,7 +212,7 @@ class POSView(QWidget):
 
         self.btn_cancelar = QPushButton("CANCELAR (F12)")
         self.btn_cancelar.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_cancelar.setFixedHeight(38)
+        self.btn_cancelar.setFixedHeight(36)
         self.btn_cancelar.setMinimumWidth(115)
         self.btn_cancelar.setStyleSheet("""
             QPushButton { 
@@ -249,14 +253,15 @@ class POSView(QWidget):
         # Contenedor para el total
         total_layout = QVBoxLayout()
         total_layout.setSpacing(0)
+        total_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
         
-        self.lbl_descuento = QLabel("")
+        self.lbl_descuento = QLabel(" ")
         self.lbl_descuento.setFont(QFont("Segoe UI", 9))
         self.lbl_descuento.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
         self.lbl_descuento.setStyleSheet("color: #D99890; font-weight: 500;")
         
         self.lbl_total = QLabel("$0.00")
-        self.lbl_total.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
+        self.lbl_total.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
         self.lbl_total.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.lbl_total.setStyleSheet("color: #000000; padding: 0px 2px;")
         
