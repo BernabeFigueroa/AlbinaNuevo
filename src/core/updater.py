@@ -8,7 +8,7 @@ from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout, QMessageBox, QApplication
 
-CURRENT_VERSION = "1.1.6"
+CURRENT_VERSION = "1.1.7"
 GITHUB_REPO = "BernabeFigueroa/AlbinaNuevo"  # Repositorio oficial para releases/binarios
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
@@ -252,54 +252,50 @@ def apply_update_and_restart(new_exe_path):
 
     import tempfile
     current_exe = os.path.abspath(sys.executable)
+    exe_name = os.path.basename(current_exe)
     pid = os.getpid()
     temp_dir = tempfile.gettempdir()
     updater_bat = os.path.join(temp_dir, "update_albina.bat")
     backup_exe = current_exe + ".old"
 
-    # Script Batch robusto que espera a que el proceso termine, renombra el viejo y coloca el nuevo
     bat_content = f"""@echo off
 chcp 65001 >nul
 title Actualizando Albina POS...
-echo ======================================================
-echo           ACTUALIZANDO ALBINA POS SAN MARTIN          
-echo ======================================================
-echo Por favor espere mientras se instala la nueva version...
 
-:: 1. Esperar a que el proceso actual finalice por completo
-timeout /t 2 /nobreak >nul
-taskkill /F /PID {pid} >nul 2>&1
+:: 1. Esperar un instante y forzar cierre de todos los procesos del ejecutable
+timeout /t 1 /nobreak >nul
+taskkill /F /T /PID {pid} >nul 2>&1
+taskkill /F /IM "{exe_name}" >nul 2>&1
 
 :: 2. Limpiar backup previo si existiera
-if exist "{backup_exe}" (
-    del /F /Q "{backup_exe}" >nul 2>&1
-)
+if exist "{backup_exe}" del /F /Q "{backup_exe}" >nul 2>&1
 
-:: 3. Intentar renombrar el ejecutable actual a .old (Windows permite renombrar archivos bloqueados por ejecución que están cerrándose)
+:: 3. Reintentos de reemplazo
 set ATTEMPTS=0
-:RETRY_MOVE
+:RETRY
 set /a ATTEMPTS+=1
 
 move /Y "{current_exe}" "{backup_exe}" >nul 2>&1
-if %ERRORLEVEL% equ 0 goto MOVE_NEW
+if %ERRORLEVEL% equ 0 goto DO_COPY
 
 copy /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
-if %ERRORLEVEL% equ 0 goto CLEANUP
+if %ERRORLEVEL% equ 0 goto FINISH
 
-if %ATTEMPTS% lss 20 (
+if %ATTEMPTS% lss 30 (
     timeout /t 1 /nobreak >nul
-    goto RETRY_MOVE
+    taskkill /F /IM "{exe_name}" >nul 2>&1
+    goto RETRY
 )
 
-:MOVE_NEW
-move /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
+:DO_COPY
+copy /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
 if %ERRORLEVEL% neq 0 (
-    copy /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
+    move /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
 )
 
-:CLEANUP
-if exist "{new_exe_path}" del /F /Q "{new_exe_path}" >nul 2>&1
+:FINISH
 if exist "{backup_exe}" del /F /Q "{backup_exe}" >nul 2>&1
+if exist "{new_exe_path}" del /F /Q "{new_exe_path}" >nul 2>&1
 
 echo Iniciando nueva version...
 start "" "{current_exe}"
@@ -326,6 +322,7 @@ exit
     except Exception as e:
         print(f"Error lanzando updater: {e}")
 
-    # Cerrar la aplicación Qt inmediatamente
+    # Forzar salida inmediata del proceso para soltar todos los handles de Windows
     QApplication.quit()
+    os._exit(0)
     sys.exit(0)
