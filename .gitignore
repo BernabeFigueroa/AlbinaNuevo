@@ -17,3 +17,6 @@ __pycache__/
 .idea/
 Thumbs.db
 Desktop.ini
+
+# Compilaciones PyInstaller
+build/
