@@ -57,20 +57,66 @@ class CajaManager:
         return caja_id
 
     @staticmethod
-    def cerrar_caja(monto_cierre: float):
+    def cerrar_caja(monto_declarado: float, monto_esperado: float = None, motivo: str = ""):
         CajaManager._check_permission()
         sesion = CajaManager.obtener_sesion_activa()
         if not sesion:
             raise Exception("No hay ninguna caja abierta.")
             
+        user = AuthManager.get_current_user()
+        usuario_id = user.id if user else sesion.get('usuario_id')
+
         supabase = get_supabase()
+        
+        # 1. Si no vino monto_esperado, calcularlo
+        if monto_esperado is None:
+            resumen = CajaManager.obtener_resumen(sesion['id'])
+            monto_esperado = resumen['total_efectivo_esperado']
+            
+        monto_declarado = float(monto_declarado)
+        monto_esperado = float(monto_esperado)
+        diferencia = round(monto_declarado - monto_esperado, 2)
+        
+        # 2. Registrar movimiento de ajuste si hubo faltante o sobrante
+        if abs(diferencia) >= 0.01:
+            if diferencia < 0:
+                tipo_mov = 'EGRESO'
+                desc_mov = f"Faltante al Cierre de Turno (-${abs(diferencia):,.2f})"
+                if motivo:
+                    desc_mov += f" - Motivo: {motivo.strip()}"
+                monto_mov = abs(diferencia)
+            else:
+                tipo_mov = 'INGRESO'
+                desc_mov = f"Sobrante al Cierre de Turno (+${abs(diferencia):,.2f})"
+                if motivo:
+                    desc_mov += f" - Motivo: {motivo.strip()}"
+                monto_mov = abs(diferencia)
+                
+            mov_data = {
+                'caja_sesion_id': sesion['id'],
+                'tipo': tipo_mov,
+                'monto': monto_mov,
+                'metodo_pago': 'EFECTIVO',
+                'descripcion': desc_mov,
+                'usuario_id': usuario_id
+            }
+            supabase.table('caja_movimientos').insert(mov_data).execute()
+
+        # 3. Actualizar la sesión de caja con el monto declarado y usuario
         data = {
-            'monto_cierre': monto_cierre,
+            'monto_cierre': monto_declarado,
             'estado': 'CERRADA',
             'fecha_cierre': datetime.now().isoformat()
         }
+        if usuario_id:
+            data['usuario_id'] = usuario_id
+            
         supabase.table('caja_sesiones').update(data).eq('id', sesion['id']).execute()
-        return True
+        return {
+            'monto_declarado': monto_declarado,
+            'monto_esperado': monto_esperado,
+            'diferencia': diferencia
+        }
 
     @staticmethod
     def registrar_movimiento(caja_sesion_id_or_tipo, tipo_or_monto, monto_or_metodo=None, metodo_pago_or_desc=None, descripcion=None):
@@ -122,6 +168,10 @@ class CajaManager:
         
         resumen = {
             'monto_inicial': 0.0,
+            'monto_cierre': None,
+            'diferencia': 0.0,
+            'estado': 'ABIERTA',
+            'usuario_nombre': 'Desconocido',
             'ventas_efectivo': 0.0,
             'ventas_transferencia': 0.0,
             'ventas_fiadas': 0.0,
@@ -134,10 +184,29 @@ class CajaManager:
             'total_vendido': 0.0
         }
         
-        # 1. Obtener monto inicial
-        sesion_res = supabase.table('caja_sesiones').select('monto_inicial').eq('id', caja_sesion_id).execute()
-        if sesion_res.data:
-            resumen['monto_inicial'] = float(sesion_res.data[0]['monto_inicial'] or 0)
+        # 1. Obtener datos de la sesión
+        try:
+            sesion_res = supabase.table('caja_sesiones').select('*, usuarios(nombre, username)').eq('id', caja_sesion_id).execute()
+            if sesion_res.data:
+                s_data = sesion_res.data[0]
+                resumen['monto_inicial'] = float(s_data.get('monto_inicial') or 0)
+                resumen['estado'] = s_data.get('estado', 'ABIERTA')
+                if s_data.get('monto_cierre') is not None:
+                    resumen['monto_cierre'] = float(s_data['monto_cierre'])
+                if s_data.get('usuarios'):
+                    resumen['usuario_nombre'] = s_data['usuarios'].get('nombre') or s_data['usuarios'].get('username') or 'Desconocido'
+        except Exception as e:
+            print(f"Error en obtener_resumen sesion: {e}")
+            try:
+                sesion_res = supabase.table('caja_sesiones').select('*').eq('id', caja_sesion_id).execute()
+                if sesion_res.data:
+                    s_data = sesion_res.data[0]
+                    resumen['monto_inicial'] = float(s_data.get('monto_inicial') or 0)
+                    resumen['estado'] = s_data.get('estado', 'ABIERTA')
+                    if s_data.get('monto_cierre') is not None:
+                        resumen['monto_cierre'] = float(s_data['monto_cierre'])
+            except Exception:
+                pass
             
         # 2. Obtener ventas de la sesión
         try:
@@ -145,12 +214,14 @@ class CajaManager:
             for v in ventas_res.data:
                 total_v = float(v['total'] or 0)
                 mp = v['metodo_pago'].upper()
-                if mp == 'EFECTIVO':
-                    resumen['ventas_efectivo'] += total_v
+                if any(term in mp for term in ['FIADO', 'CTA. CTE', 'CTA CTE', 'CTA_CTE']):
+                    resumen['ventas_fiadas'] += total_v
+                elif mp == 'MIXTO':
+                    resumen['ventas_otros'] += total_v
                 elif mp in ['TRANSFERENCIA', 'TARJETA']:
                     resumen['ventas_transferencia'] += total_v
-                elif mp in ['CTA_CTE', 'CTA CTE', 'FIADO']:
-                    resumen['ventas_fiadas'] += total_v
+                elif mp == 'EFECTIVO':
+                    resumen['ventas_efectivo'] += total_v
                 else:
                     resumen['ventas_otros'] += total_v
         except Exception as e:
@@ -165,12 +236,27 @@ class CajaManager:
                 tipo = m['tipo']
                 mp = m['metodo_pago']
                 desc = m['descripcion'] or ''
+                desc_upper = desc.upper()
                 
                 if desc == 'Apertura de Caja':
                     continue
-                    
+                
+                # No sumar faltantes o sobrantes de cierre a ingresos/egresos operativos
+                if "FALTANTE AL CIERRE" in desc_upper or "SOBRANTE AL CIERRE" in desc_upper:
+                    continue
+
+                # Movimientos generados por cobros de ventas mixtas
+                if tipo == 'VENTA' and "(MIXTO)" in desc_upper:
+                    if mp == 'EFECTIVO':
+                        resumen['ventas_efectivo'] += monto_m
+                    elif mp == 'TRANSFERENCIA':
+                        resumen['ventas_transferencia'] += monto_m
+                    # Descontar de ventas_otros para que no duplique en total_vendido
+                    resumen['ventas_otros'] = max(0.0, resumen['ventas_otros'] - monto_m)
+                    continue
+
                 if tipo == 'INGRESO':
-                    if "PAGO DE DEUDA" in desc.upper() or "PAGO DE CTAS CTES" in desc.upper() or "PAGO CTA CTE" in desc.upper():
+                    if any(term in desc_upper for term in ["PAGO DE DEUDA", "COBRO DEUDA", "PAGO DE CTAS CTES", "PAGO CTA CTE", "COBRO CTA. CTE", "COBRO CTA CTE"]):
                         if mp == 'EFECTIVO':
                             resumen['pagos_deuda_efectivo'] += monto_m
                         else:
@@ -196,6 +282,9 @@ class CajaManager:
             resumen['egresos_manuales']
         )
         
+        if resumen['monto_cierre'] is not None:
+            resumen['diferencia'] = round(resumen['monto_cierre'] - resumen['total_efectivo_esperado'], 2)
+            
         return resumen
 
     @staticmethod

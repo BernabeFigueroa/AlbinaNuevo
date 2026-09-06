@@ -137,6 +137,23 @@ class ProductosManager:
         return True
 
     @staticmethod
+    def actualizar_precios_rapido(producto_id: int, nuevo_precio_contado: float, nuevo_precio_tarjeta: float):
+        """Actualiza rápidamente los precios de un producto (contado y tarjeta) desde POS."""
+        ProductosManager._check_permission()
+        user = AuthManager.get_current_user()
+        usuario_id = user.id if user else None
+
+        supabase = get_supabase()
+        data = {
+            'precio_contado': nuevo_precio_contado,
+            'precio_tarjeta': nuevo_precio_tarjeta,
+            'modificado_por': usuario_id
+        }
+        supabase.table('productos').update(data).eq('id', producto_id).execute()
+        ProductosManager._invalidate_cache()
+        return True
+
+    @staticmethod
     def eliminar_producto(producto_id):
         ProductosManager._check_permission()
         supabase = get_supabase()

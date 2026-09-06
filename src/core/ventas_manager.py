@@ -21,7 +21,7 @@ class VentasManager:
         res_cliente = supabase.table('clientes').select('descuento_porcentaje').eq('id', cliente_id).execute()
         pct_descuento_cliente = float(res_cliente.data[0].get('descuento_porcentaje', 0) if res_cliente.data else 0)
 
-        if metodo_pago in ['EFECTIVO', 'TRANSFERENCIA']:
+        if metodo_pago in ['EFECTIVO', 'TRANSFERENCIA', 'MIXTO']:
             total_contado = sum(item['cantidad'] * float(item.get('precio_contado', item['precio_unitario'])) for item in carrito)
             descuento_cliente = total_contado * (pct_descuento_cliente / 100.0) if pct_descuento_cliente > 0 else 0.0
             total = total_contado - descuento_cliente
@@ -34,6 +34,17 @@ class VentasManager:
         user = AuthManager.get_current_user()
         usuario_id = user.id if user else None
 
+        # Detectar si en el carrito hubo modificación manual de precios
+        items_modificados = [
+            f"{it['nombre'][:15]} (${it.get('precio_original_efectivo', 0):.0f}->${it.get('precio_contado', 0):.0f})"
+            for it in carrito if it.get('precio_modificado')
+        ]
+        info_modificado = None
+        if items_modificados:
+            info_modificado = "PRECIO MODIFICADO: " + ", ".join(items_modificados)
+            if len(info_modificado) > 100:
+                info_modificado = info_modificado[:97] + "..."
+
         # 1. Crear registro de venta
         venta_data = {
             'cliente_id': cliente_id,
@@ -43,6 +54,7 @@ class VentasManager:
             'descuento_total': descuento_total,
             'total': total,
             'metodo_pago': metodo_pago,
+            'nro_comprobante_afip': info_modificado,
             'estado': 'COMPLETADA'
         }
         res_venta = supabase.table('ventas').insert(venta_data).execute()
@@ -60,7 +72,7 @@ class VentasManager:
                     supabase.table('productos').update({'stock_actual': nuevo_stock}).eq('id', item['producto_id']).execute()
             
             # Determinar precio unitario efectivo cobrado según medio de pago
-            if metodo_pago in ['EFECTIVO', 'TRANSFERENCIA']:
+            if metodo_pago in ['EFECTIVO', 'TRANSFERENCIA', 'MIXTO']:
                 p_unit_efectivo = float(item.get('precio_contado', item['precio_unitario']))
             else:
                 p_unit_efectivo = float(item['precio_unitario'])
@@ -134,4 +146,17 @@ class VentasManager:
                 'precio_unitario': d['precio_unitario'],
                 'subtotal': d['subtotal']
             })
-        return resultado
+
+        # Obtener información adicional de la venta (ej. observaciones o ajuste de precios)
+        info_venta = {}
+        try:
+            res_v = supabase.table('ventas').select('nro_comprobante_afip, metodo_pago, fecha').eq('id', venta_id).execute()
+            if res_v.data:
+                info_venta = res_v.data[0]
+        except Exception:
+            pass
+
+        return {
+            'detalles': resultado,
+            'info_venta': info_venta
+        }

@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox,
     QPushButton, QMessageBox, QFrame, QGridLayout, QSpacerItem, QSizePolicy,
-    QTableWidget, QTableWidgetItem, QHeaderView
+    QTableWidget, QTableWidgetItem, QHeaderView, QDialog
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -12,6 +12,266 @@ except ImportError:
     zoneinfo = None
 
 from src.core.caja_manager import CajaManager
+from src.core.auth_manager import AuthManager
+
+class DialogoDetalleCierre(QDialog):
+    def __init__(self, titulo, contenido_html, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(titulo)
+        self.setMinimumWidth(520)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #FAF8F5;
+                border: 1px solid #E5DFD5;
+                border-radius: 12px;
+            }
+            QLabel {
+                color: #2C2520;
+                font-size: 13px;
+            }
+            QPushButton {
+                background-color: #B09886;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 8px;
+                padding: 8px 26px;
+                font-weight: 600;
+                font-size: 13px;
+                min-height: 34px;
+            }
+            QPushButton:hover {
+                background-color: #9C8573;
+            }
+            QPushButton:pressed {
+                background-color: #8C7869;
+            }
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        
+        lbl_titulo = QLabel(titulo)
+        lbl_titulo.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        lbl_titulo.setStyleSheet("color: #2C2520;")
+        layout.addWidget(lbl_titulo)
+        
+        frame = QFrame()
+        frame.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-radius: 10px;
+                border: 1px solid #E5DFD5;
+            }
+        """)
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setContentsMargins(18, 18, 18, 18)
+        
+        lbl_contenido = QLabel(contenido_html)
+        lbl_contenido.setWordWrap(True)
+        lbl_contenido.setTextFormat(Qt.TextFormat.RichText)
+        frame_layout.addWidget(lbl_contenido)
+        layout.addWidget(frame)
+        
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_ok = QPushButton("Aceptar")
+        btn_ok.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_ok.clicked.connect(self.accept)
+        btn_layout.addWidget(btn_ok)
+        layout.addLayout(btn_layout)
+
+
+class DialogoCerrarTurno(QDialog):
+    def __init__(self, esperado: float, usuario_nombre: str, parent=None):
+        super().__init__(parent)
+        self.esperado = float(esperado)
+        self.usuario_nombre = usuario_nombre
+        self.declarado = 0.0
+        self.diferencia = 0.0
+        self.motivo = ""
+        
+        self.setWindowTitle("Arqueo y Cierre de Turno")
+        self.setMinimumWidth(500)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #FAF8F5;
+                border: 1px solid #E5DFD5;
+                border-radius: 12px;
+            }
+            QLabel {
+                color: #2C2520;
+            }
+            QLineEdit {
+                background-color: #FFFFFF;
+                color: #2C2520;
+                border: 1px solid #D5CFC7;
+                border-radius: 8px;
+                padding: 6px 12px;
+                font-size: 14px;
+                min-height: 32px;
+            }
+            QLineEdit:focus {
+                border: 1.5px solid #8C7869;
+                background-color: #FCFBF9;
+            }
+        """)
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(14)
+        
+        lbl_tit = QLabel("Cierre de Turno y Arqueo de Caja")
+        lbl_tit.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        lbl_tit.setStyleSheet("color: #2C2520;")
+        layout.addWidget(lbl_tit)
+        
+        # Tarjeta resumen informativo
+        card_info = QFrame()
+        card_info.setStyleSheet("background-color: #FFFFFF; border: 1px solid #E5DFD5; border-radius: 10px; padding: 10px;")
+        layout_info = QGridLayout(card_info)
+        layout_info.setSpacing(8)
+        
+        lbl_u_tit = QLabel("Usuario que cierra:")
+        lbl_u_tit.setFont(QFont("Segoe UI", 11))
+        lbl_u_tit.setStyleSheet("color: #7A7067;")
+        self.lbl_u_val = QLabel(self.usuario_nombre)
+        self.lbl_u_val.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        self.lbl_u_val.setStyleSheet("color: #2C2520;")
+        layout_info.addWidget(lbl_u_tit, 0, 0)
+        layout_info.addWidget(self.lbl_u_val, 0, 1)
+        
+        lbl_esp_tit = QLabel("Efectivo esperado (Sistema):")
+        lbl_esp_tit.setFont(QFont("Segoe UI", 12))
+        lbl_esp_tit.setStyleSheet("color: #7A7067;")
+        self.lbl_esp_val = QLabel(f"$ {self.esperado:,.2f}")
+        self.lbl_esp_val.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
+        self.lbl_esp_val.setStyleSheet("color: #B09886;")
+        self.lbl_esp_val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        layout_info.addWidget(lbl_esp_tit, 1, 0)
+        layout_info.addWidget(self.lbl_esp_val, 1, 1)
+        
+        layout.addWidget(card_info)
+        
+        # Entrada de dinero contado
+        lbl_dec = QLabel("Efectivo real contado en caja: ($)")
+        lbl_dec.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        lbl_dec.setStyleSheet("color: #2C2520; margin-top: 4px;")
+        layout.addWidget(lbl_dec)
+        
+        self.txt_declarado = QLineEdit(f"{self.esperado:.2f}")
+        self.txt_declarado.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
+        self.txt_declarado.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.txt_declarado.textChanged.connect(self.recalcular_diferencia)
+        layout.addWidget(self.txt_declarado)
+        
+        # Panel de diferencia / resultado
+        self.card_dif = QFrame()
+        self.card_dif.setStyleSheet("background-color: #FFFFFF; border: 1px solid #E5DFD5; border-radius: 10px; padding: 10px;")
+        layout_dif = QHBoxLayout(self.card_dif)
+        
+        self.lbl_dif_tit = QLabel("DIFERENCIA:")
+        self.lbl_dif_tit.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        layout_dif.addWidget(self.lbl_dif_tit)
+        
+        self.lbl_dif_val = QLabel("$ 0.00 (Exacto)")
+        self.lbl_dif_val.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        self.lbl_dif_val.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        layout_dif.addWidget(self.lbl_dif_val)
+        
+        layout.addWidget(self.card_dif)
+        
+        # Campo observaciones
+        lbl_mot = QLabel("Observaciones / Motivo (en caso de diferencia):")
+        lbl_mot.setFont(QFont("Segoe UI", 10))
+        lbl_mot.setStyleSheet("color: #7A7067;")
+        layout.addWidget(lbl_mot)
+        
+        self.txt_motivo = QLineEdit()
+        layout.addWidget(self.txt_motivo)
+        
+        layout.addSpacing(6)
+        
+        # Botones
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(10)
+        
+        btn_cancelar = QPushButton("Cancelar")
+        btn_cancelar.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        btn_cancelar.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_cancelar.setStyleSheet("""
+            QPushButton {
+                background-color: #ACA096;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 18px;
+                min-height: 34px;
+            }
+            QPushButton:hover { background-color: #918A83; }
+        """)
+        btn_cancelar.clicked.connect(self.reject)
+        btn_layout.addWidget(btn_cancelar)
+        
+        self.btn_confirmar = QPushButton("CONFIRMAR CIERRE")
+        self.btn_confirmar.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        self.btn_confirmar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_confirmar.setStyleSheet("""
+            QPushButton {
+                background-color: #D99890;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 24px;
+                min-height: 34px;
+            }
+            QPushButton:hover { background-color: #C5847C; }
+            QPushButton:pressed { background-color: #A96860; }
+        """)
+        self.btn_confirmar.clicked.connect(self.validar_y_cerrar)
+        btn_layout.addWidget(self.btn_confirmar)
+        
+        layout.addLayout(btn_layout)
+        
+        # Inicializar cálculo
+        self.recalcular_diferencia()
+
+    def recalcular_diferencia(self):
+        txt = self.txt_declarado.text().replace("$", "").replace(" ", "").replace(",", ".").strip()
+        try:
+            dec = float(txt) if txt else 0.0
+        except ValueError:
+            self.lbl_dif_val.setText("Monto inválido")
+            self.lbl_dif_val.setStyleSheet("color: #D99890;")
+            return
+            
+        dif = round(dec - self.esperado, 2)
+        if abs(dif) < 0.01:
+            self.lbl_dif_val.setText("$ 0.00 (Cuadrado)")
+            self.lbl_dif_val.setStyleSheet("color: #2E7D32;")
+        elif dif < 0:
+            self.lbl_dif_val.setText(f"-${abs(dif):,.2f} (FALTANTE)")
+            self.lbl_dif_val.setStyleSheet("color: #C62828;")
+        else:
+            self.lbl_dif_val.setText(f"+${dif:,.2f} (SOBRANTE)")
+            self.lbl_dif_val.setStyleSheet("color: #2E7D32;")
+
+    def validar_y_cerrar(self):
+        txt = self.txt_declarado.text().replace("$", "").replace(" ", "").replace(",", ".").strip()
+        try:
+            self.declarado = float(txt)
+            if self.declarado < 0:
+                raise ValueError()
+        except ValueError:
+            QMessageBox.warning(self, "Atención", "Por favor ingrese un monto de efectivo válido (0 o superior).")
+            self.txt_declarado.setFocus()
+            return
+            
+        self.diferencia = round(self.declarado - self.esperado, 2)
+        self.motivo = self.txt_motivo.text().strip()
+        self.accept()
 
 def formatear_fecha_ar(fecha_str):
     if not fecha_str:
@@ -176,7 +436,9 @@ class CajaView(QWidget):
         
         # Tabla de Movimientos de la sesión actual
         self.frame_tabla, tabla_layout = self.crear_tarjeta("Movimientos Registrados")
+        self.frame_tabla.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.tabla_movs = QTableWidget(0, 4)
+        self.tabla_movs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.tabla_movs.setHorizontalHeaderLabels(["Fecha", "Tipo", "Descripción", "Monto"])
         self.tabla_movs.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.tabla_movs.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
@@ -184,10 +446,10 @@ class CajaView(QWidget):
         self.tabla_movs.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self.tabla_movs.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla_movs.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.tabla_movs.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.tabla_movs.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         tabla_layout.addWidget(self.tabla_movs)
-        left_panel.addWidget(self.frame_tabla)
-        
-        left_panel.addStretch()
+        left_panel.addWidget(self.frame_tabla, 1)
 
         content_layout.addLayout(left_panel, 1)
 
@@ -375,18 +637,63 @@ class CajaView(QWidget):
         if not self.sesion_activa:
             return
             
-        reply = QMessageBox.question(self, "Cerrar Caja", "¿Está seguro de cerrar el turno actual?",
-                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            try:
-                resumen = CajaManager.obtener_resumen(self.sesion_activa['id'])
-                monto_cierre = resumen['total_efectivo_esperado']
-                CajaManager.cerrar_caja(monto_cierre)
-                QMessageBox.information(self, "Caja Cerrada", f"Turno cerrado.\n\nSaldo final declarado: ${monto_cierre:,.2f}")
-                self.actualizar_estado()
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Fallo al cerrar:\n{str(e)}")
+        try:
+            resumen = CajaManager.obtener_resumen(self.sesion_activa['id'])
+            esperado = resumen['total_efectivo_esperado']
+            
+            user = AuthManager.get_current_user()
+            nombre_usuario = "Admin" if AuthManager.is_admin() else "Empleada"
+            if user and hasattr(user, 'email') and user.email:
+                nombre_usuario = f"{nombre_usuario} ({user.email})"
+            
+            dlg = DialogoCerrarTurno(esperado, nombre_usuario, self)
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+                
+            declarado = dlg.declarado
+            motivo = dlg.motivo
+            diferencia = round(declarado - esperado, 2)
+            
+            resultado = CajaManager.cerrar_caja(declarado, esperado, motivo)
+            
+            # Modal moderno y estilizado de confirmación con detalle completo
+            dif_color = "#2E7D32" if abs(diferencia) < 0.01 else ("#C62828" if diferencia < 0 else "#2E7D32")
+            dif_texto = "$ 0.00 (Exacto)" if abs(diferencia) < 0.01 else (f"-${abs(diferencia):,.2f} (FALTANTE)" if diferencia < 0 else f"+${diferencia:,.2f} (SOBRANTE)")
+            
+            html_exito = f"""
+            <table width="100%" cellspacing="8" cellpadding="0" style="font-family: 'Segoe UI', sans-serif;">
+                <tr>
+                    <td style="color: #7A7067; font-size: 13px;">Usuario responsable:</td>
+                    <td align="right" style="color: #2C2520; font-weight: 600; font-size: 13px;">{nombre_usuario}</td>
+                </tr>
+                <tr>
+                    <td style="color: #7A7067; font-size: 13px;">Efectivo esperado por sistema:</td>
+                    <td align="right" style="color: #2C2520; font-weight: 600; font-size: 13px;">$ {esperado:,.2f}</td>
+                </tr>
+                <tr>
+                    <td style="color: #7A7067; font-size: 13px;">Efectivo declarado en caja:</td>
+                    <td align="right" style="color: #B09886; font-weight: 700; font-size: 15px;">$ {declarado:,.2f}</td>
+                </tr>
+                <tr>
+                    <td style="color: #7A7067; font-size: 13px;">Diferencia de arqueo:</td>
+                    <td align="right" style="color: {dif_color}; font-weight: 700; font-size: 14px;">{dif_texto}</td>
+                </tr>
+            """
+            if motivo:
+                html_exito += f"""
+                <tr>
+                    <td style="color: #7A7067; font-size: 12px; vertical-align: top;">Observaciones:</td>
+                    <td align="right" style="color: #7A7067; font-style: italic; font-size: 12px;">{motivo}</td>
+                </tr>
+                """
+            html_exito += "</table>"
+            
+            dlg_res = DialogoDetalleCierre("Turno Cerrado Correctamente", html_exito, self)
+            dlg_res.exec()
+            
+            self.actualizar_estado()
+        except Exception as e:
+            QMessageBox.critical(self, "Error al Cerrar Turno", f"Fallo al registrar el cierre de caja:\n{str(e)}")
 
     def showEvent(self, event):
         super().showEvent(event)

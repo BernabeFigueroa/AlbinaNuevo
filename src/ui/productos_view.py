@@ -13,6 +13,7 @@ class NumericLineEdit(QLineEdit):
 from src.core.productos_manager import ProductosManager
 from src.core.categorias_manager import CategoriasManager
 from src.core.proveedores_manager import ProveedoresManager
+from src.core.configuracion_manager import ConfiguracionManager
 
 class ProductosView(QWidget):
     def __init__(self):
@@ -336,10 +337,12 @@ class ProductosView(QWidget):
             self.txt_precio_contado.setText(f"{precio_contado:.2f}")
             self.txt_precio_contado.blockSignals(False)
 
-            # Ya no obligamos al precio tarjeta (Local) a ser un +51%, 
-            # solo lo pre-llenamos con algo razonable si está en 0 para ayudar.
-            if not self.txt_precio_tarjeta.text() or float(self.txt_precio_tarjeta.text() or 0) == 0:
-                self.txt_precio_tarjeta.setText(f"{precio_contado:.2f}")
+            # Aplicar porcentaje configurado de tarjeta/lista sobre el precio de contado
+            pct_tarjeta = ConfiguracionManager.get_recargo_tarjeta()
+            precio_tarjeta = precio_contado * (1 + (pct_tarjeta / 100))
+            self.txt_precio_tarjeta.blockSignals(True)
+            self.txt_precio_tarjeta.setText(f"{precio_tarjeta:.2f}")
+            self.txt_precio_tarjeta.blockSignals(False)
 
         except ValueError:
             pass
@@ -360,8 +363,12 @@ class ProductosView(QWidget):
             self.txt_utilidad.setText(f"{utilidad:.2f}")
             self.txt_utilidad.blockSignals(False)
 
-            if not self.txt_precio_tarjeta.text() or float(self.txt_precio_tarjeta.text() or 0) == 0:
-                self.txt_precio_tarjeta.setText(f"{precio_contado:.2f}")
+            # Aplicar porcentaje configurado de tarjeta/lista sobre el precio de contado
+            pct_tarjeta = ConfiguracionManager.get_recargo_tarjeta()
+            precio_tarjeta = precio_contado * (1 + (pct_tarjeta / 100))
+            self.txt_precio_tarjeta.blockSignals(True)
+            self.txt_precio_tarjeta.setText(f"{precio_tarjeta:.2f}")
+            self.txt_precio_tarjeta.blockSignals(False)
 
         except ValueError:
             pass

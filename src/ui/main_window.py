@@ -9,6 +9,7 @@ from src.ui.proveedores_view import ProveedoresView
 from src.ui.categorias_view import CategoriasView
 from src.ui.deudores_view import DeudoresView
 from src.ui.deudas_proveedores_view import DeudasProveedoresView
+from src.ui.ajustes_view import AjustesView
 from src.core.auth_manager import AuthManager
 
 class MainWindow(QMainWindow):
@@ -73,6 +74,7 @@ class MainWindow(QMainWindow):
         self.btn_deudores = self.crear_boton_menu("Cuentas Ctes. (Fiado)")
         self.btn_caja = self.crear_boton_menu("Caja Diaria")
         self.btn_reportes = self.crear_boton_menu("Reportes")
+        self.btn_ajustes = self.crear_boton_menu("Ajustes")
 
         sidebar_layout.addWidget(self.btn_pos)
         sidebar_layout.addWidget(self.btn_productos)
@@ -86,8 +88,10 @@ class MainWindow(QMainWindow):
         # Ocultar botones según rol
         if AuthManager.is_admin():
             sidebar_layout.addWidget(self.btn_reportes)
+            sidebar_layout.addWidget(self.btn_ajustes)
         else:
             self.btn_reportes.hide()
+            self.btn_ajustes.hide()
             self.btn_categorias.hide()
             self.btn_proveedores.hide()
             self.btn_deudas_proveedores.hide()
@@ -133,6 +137,7 @@ class MainWindow(QMainWindow):
         self.deudores_view = None
         self.caja_view = None
         self.reportes_view = None
+        self.ajustes_view = None
         
         # Agregar vistas al stack
         self.stacked_widget.addWidget(self.pos_view)
@@ -190,6 +195,12 @@ class MainWindow(QMainWindow):
                 self.stacked_widget.addWidget(self.reportes_view)
             self.stacked_widget.setCurrentWidget(self.reportes_view)
 
+        def show_ajustes():
+            if self.ajustes_view is None:
+                self.ajustes_view = AjustesView()
+                self.stacked_widget.addWidget(self.ajustes_view)
+            self.stacked_widget.setCurrentWidget(self.ajustes_view)
+
         self.btn_productos.clicked.connect(show_productos)
         self.btn_categorias.clicked.connect(show_categorias)
         self.btn_proveedores.clicked.connect(show_proveedores)
@@ -198,6 +209,7 @@ class MainWindow(QMainWindow):
         self.btn_deudores.clicked.connect(show_deudores)
         self.btn_caja.clicked.connect(show_caja)
         self.btn_reportes.clicked.connect(show_reportes)
+        self.btn_ajustes.clicked.connect(show_ajustes)
 
         # Conectar señal para ocultar/mostrar menú
         self.pos_view.toggle_sidebar.connect(self.toggle_sidebar_visibility)

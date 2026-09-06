@@ -23,7 +23,7 @@ class ReportesManager:
         
         supabase = get_supabase()
         
-        query = supabase.table('ventas').select('id, fecha, total, metodo_pago, clientes(nombre), usuarios(nombre, username)').neq('estado', 'CANCELADA').gte('fecha', desde).lte('fecha', hasta)
+        query = supabase.table('ventas').select('id, fecha, total, metodo_pago, nro_comprobante_afip, clientes(nombre), usuarios(nombre, username)').neq('estado', 'CANCELADA').gte('fecha', desde).lte('fecha', hasta)
         
         if metodo_pago:
             query = query.eq('metodo_pago', metodo_pago)
@@ -56,13 +56,18 @@ class ReportesManager:
             if v.get('usuarios'):
                 vendedor = v['usuarios'].get('nombre') or v['usuarios'].get('username') or 'Desconocido'
                 
+            nota_mod = v.get('nro_comprobante_afip')
+            tiene_mod_precio = bool(nota_mod and "PRECIO MODIFICADO" in str(nota_mod))
+
             ventas_fmt.append({
                 'id': v['id'],
                 'fecha': v['fecha'],
                 'total': total,
                 'metodo_pago': mp,
                 'cliente': v['clientes']['nombre'] if v.get('clientes') else 'Consumidor Final',
-                'vendedor': vendedor
+                'vendedor': vendedor,
+                'precio_modificado': tiene_mod_precio,
+                'detalle_modificacion': nota_mod if tiene_mod_precio else None
             })
             
         return {

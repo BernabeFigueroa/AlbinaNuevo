@@ -1,20 +1,159 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox,
-    QTableWidget, QTableWidgetItem, QPushButton, QHeaderView, QMessageBox, QFrame, QGridLayout, QInputDialog, QRadioButton, QButtonGroup, QSizePolicy
+    QTableWidget, QTableWidgetItem, QPushButton, QHeaderView, QMessageBox, QFrame, 
+    QGridLayout, QInputDialog, QRadioButton, QButtonGroup, QSizePolicy, QDialog
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QShortcut, QKeySequence
 
 from src.core.productos_manager import ProductosManager
 from src.core.ventas_manager import VentasManager
-from src.core.ventas_manager import VentasManager
 from src.core.caja_manager import CajaManager
 from src.core.promociones_manager import PromocionesManager
 from src.core.clientes_manager import ClientesManager
 from src.core.cta_cte_manager import CtaCteManager
+from src.core.configuracion_manager import ConfiguracionManager
 from src.utils.impresion_ticket import ImpresoraTicket
 from src.ui.buscador_productos import BuscadorProductosDialog
 from src.ui.buscador_clientes import BuscadorClientesDialog
+
+
+class DialogoModificarPrecio(QDialog):
+    """
+    Modal boutique cuando el usuario modifica el precio unitario de un producto en el POS.
+    Pregunta si el cambio aplica solo para esta venta o si actualiza el precio en la base de datos.
+    """
+    def __init__(self, producto_nombre: str, precio_anterior: float, precio_nuevo: float, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Modificación de Precio")
+        self.setMinimumWidth(460)
+        self.respuesta = None  # 'SOLO_VENTA' o 'ACTUALIZAR_BD'
+        
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #FAF8F5;
+                border: 1px solid #E5DFD5;
+                border-radius: 12px;
+            }
+            QLabel {
+                color: #2C2520;
+            }
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(26, 24, 26, 24)
+        layout.setSpacing(18)
+        
+        lbl_titulo = QLabel("Ajuste de Precio Unitario")
+        lbl_titulo.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
+        lbl_titulo.setStyleSheet("color: #2C2520;")
+        layout.addWidget(lbl_titulo)
+        
+        # Tarjeta resumen del cambio
+        card = QFrame()
+        card.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border: 1px solid #E5DFD5;
+                border-radius: 8px;
+            }
+        """)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(18, 14, 18, 14)
+        card_layout.setSpacing(8)
+        
+        lbl_prod = QLabel(f"<b>Artículo:</b> {producto_nombre}")
+        lbl_prod.setFont(QFont("Segoe UI", 11))
+        lbl_prod.setWordWrap(True)
+        card_layout.addWidget(lbl_prod)
+        
+        lbl_precios = QLabel(
+            f"Precio anterior: <s>${precio_anterior:,.2f}</s> &nbsp;➔&nbsp; "
+            f"<b style='color: #B09886; font-size: 14px;'>Nuevo precio: ${precio_nuevo:,.2f}</b>"
+        )
+        lbl_precios.setTextFormat(Qt.TextFormat.RichText)
+        lbl_precios.setFont(QFont("Segoe UI", 11))
+        card_layout.addWidget(lbl_precios)
+        layout.addWidget(card)
+        
+        # Pregunta
+        lbl_pregunta = QLabel("¿Cómo deseas aplicar este cambio de precio?")
+        lbl_pregunta.setFont(QFont("Segoe UI", 11, QFont.Weight.DemiBold))
+        lbl_pregunta.setStyleSheet("color: #2C2520;")
+        layout.addWidget(lbl_pregunta)
+        
+        # Botones de Acción
+        btn_layout = QVBoxLayout()
+        btn_layout.setSpacing(10)
+        
+        # Opción 1: Solo para esta venta
+        btn_solo_venta = QPushButton("Modificar SOLO para esta venta")
+        btn_solo_venta.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_solo_venta.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        btn_solo_venta.setStyleSheet("""
+            QPushButton {
+                background-color: #FAF8F5;
+                color: #2C2520;
+                border: 1.5px solid #B09886;
+                border-radius: 8px;
+                padding: 10px 16px;
+                text-align: left;
+            }
+            QPushButton:hover {
+                background-color: #F4EFE6;
+            }
+        """)
+        btn_solo_venta.clicked.connect(self._elegir_solo_venta)
+        btn_layout.addWidget(btn_solo_venta)
+        
+        # Opción 2: Actualizar en Base de Datos
+        btn_actualizar_bd = QPushButton("Actualizar precio en Base de Datos (Permanente)")
+        btn_actualizar_bd.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_actualizar_bd.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+        btn_actualizar_bd.setStyleSheet("""
+            QPushButton {
+                background-color: #B09886;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 16px;
+                text-align: left;
+            }
+            QPushButton:hover {
+                background-color: #9C8573;
+            }
+        """)
+        btn_actualizar_bd.clicked.connect(self._elegir_actualizar_bd)
+        btn_layout.addWidget(btn_actualizar_bd)
+        
+        # Botón Cancelar
+        btn_cancelar = QPushButton("Cancelar (Mantener precio anterior)")
+        btn_cancelar.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_cancelar.setFont(QFont("Segoe UI", 10))
+        btn_cancelar.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #7A7067;
+                border: none;
+                padding: 6px;
+            }
+            QPushButton:hover {
+                color: #000000;
+                text-decoration: underline;
+            }
+        """)
+        btn_cancelar.clicked.connect(self.reject)
+        btn_layout.addWidget(btn_cancelar, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        layout.addLayout(btn_layout)
+
+    def _elegir_solo_venta(self):
+        self.respuesta = 'SOLO_VENTA'
+        self.accept()
+
+    def _elegir_actualizar_bd(self):
+        self.respuesta = 'ACTUALIZAR_BD'
+        self.accept()
 
 class POSView(QWidget):
     venta_realizada = pyqtSignal()
@@ -526,7 +665,7 @@ class POSView(QWidget):
         self.tabla_carrito.setRowCount(0)
         
         medio_pago = self.cb_medio_pago.currentText()
-        es_contado = medio_pago in ["EFECTIVO", "TRANSFERENCIA"]
+        es_contado = medio_pago in ["EFECTIVO", "TRANSFERENCIA", "MIXTO"]
         
         total_lista = 0.0
         total_efectivo_base = 0.0
@@ -553,13 +692,13 @@ class POSView(QWidget):
             item_pu = QTableWidgetItem(f"{p_unitario_actual:.2f}")
             item_imp = QTableWidgetItem(f"{subtotal_item:.2f}")
 
-            # Solo la cantidad (columna 3) es editable, el resto bloqueado
+            # La cantidad (columna 3) y el precio unitario (columna 4) son editables para artículos normales
             item_cod.setFlags(item_cod.flags() & ~Qt.ItemFlag.ItemIsEditable)
             item_desc.setFlags(item_desc.flags() & ~Qt.ItemFlag.ItemIsEditable)
             item_talle.setFlags(item_talle.flags() & ~Qt.ItemFlag.ItemIsEditable)
             if item.get('es_promo'):
                 item_cant.setFlags(item_cant.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            item_pu.setFlags(item_pu.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                item_pu.setFlags(item_pu.flags() & ~Qt.ItemFlag.ItemIsEditable)
             item_imp.setFlags(item_imp.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
             self.tabla_carrito.setItem(row_idx, 0, item_cod)
@@ -604,7 +743,13 @@ class POSView(QWidget):
         row = item.row()
         col = item.column()
         
-        if col == 3: # Columna Cantidad (antes era 2)
+        if row >= len(self.carrito):
+            return
+
+        carrito_item = self.carrito[row]
+
+        # 1. EDICIÓN DE CANTIDAD (Columna 3)
+        if col == 3:
             try:
                 texto_cant = item.text().replace(',', '.')
                 nueva_cantidad = float(texto_cant)
@@ -615,10 +760,92 @@ class POSView(QWidget):
                 self.actualizar_tabla()
                 return
 
-            if row < len(self.carrito):
-                self.carrito[row]['cantidad'] = nueva_cantidad
-                self.procesar_promociones()
+            carrito_item['cantidad'] = nueva_cantidad
+            self.procesar_promociones()
+            self.actualizar_tabla()
+
+        # 2. EDICIÓN DE PRECIO UNITARIO (Columna 4)
+        elif col == 4:
+            if carrito_item.get('es_promo'):
                 self.actualizar_tabla()
+                return
+
+            try:
+                texto_pu = item.text().replace('$', '').replace(',', '.').strip()
+                nuevo_precio = float(texto_pu)
+                if nuevo_precio < 0:
+                    raise ValueError
+            except ValueError:
+                QMessageBox.warning(self, "Error", "El precio unitario debe ser un número válido mayor o igual a 0.")
+                self.actualizar_tabla()
+                return
+
+            medio_pago = self.cb_medio_pago.currentText()
+            es_contado = medio_pago in ["EFECTIVO", "TRANSFERENCIA", "MIXTO"]
+
+            # Precio que tenía en pantalla según el medio de pago actual
+            p_actual_pantalla = carrito_item['precio_contado'] if es_contado else carrito_item['precio_tarjeta']
+
+            # Si el precio ingresado es idéntico, no hacemos nada
+            if abs(nuevo_precio - p_actual_pantalla) < 0.01:
+                return
+
+            # Abrir modal de confirmación y destino del cambio
+            dialogo = DialogoModificarPrecio(
+                producto_nombre=carrito_item['nombre'],
+                precio_anterior=p_actual_pantalla,
+                precio_nuevo=nuevo_precio,
+                parent=self
+            )
+            dialogo.exec()
+
+            if not dialogo.respuesta:
+                # Canceló el diálogo: revertimos la tabla al precio anterior
+                self.actualizar_tabla()
+                return
+
+            # Calcular los precios correspondientes (contado y tarjeta con el recargo configurado)
+            pct_tarjeta = ConfiguracionManager.get_recargo_tarjeta()
+            if es_contado:
+                nuevo_p_contado = nuevo_precio
+                nuevo_p_tarjeta = nuevo_precio * (1.0 + (pct_tarjeta / 100.0))
+            else:
+                nuevo_p_tarjeta = nuevo_precio
+                nuevo_p_contado = nuevo_precio / (1.0 + (pct_tarjeta / 100.0)) if pct_tarjeta > -100 else nuevo_precio
+
+            # Guardar en el carrito y marcar como precio modificado para auditoría
+            if 'precio_original_efectivo' not in carrito_item:
+                carrito_item['precio_original_efectivo'] = carrito_item['precio_contado']
+                carrito_item['precio_original_tarjeta'] = carrito_item['precio_tarjeta']
+
+            carrito_item['precio_contado'] = nuevo_p_contado
+            carrito_item['precio_tarjeta'] = nuevo_p_tarjeta
+            carrito_item['precio_unitario'] = nuevo_p_contado if es_contado else nuevo_p_tarjeta
+            carrito_item['precio_modificado'] = True
+
+            # Si eligió actualizar en Base de Datos permanentemente
+            if dialogo.respuesta == 'ACTUALIZAR_BD' and carrito_item.get('producto_id'):
+                try:
+                    ProductosManager.actualizar_precios_rapido(
+                        producto_id=carrito_item['producto_id'],
+                        nuevo_precio_contado=nuevo_p_contado,
+                        nuevo_precio_tarjeta=nuevo_p_tarjeta
+                    )
+                    QMessageBox.information(
+                        self,
+                        "Precio Actualizado",
+                        f"El precio del producto '{carrito_item['nombre']}' se actualizó correctamente en la Base de Datos:\n"
+                        f"• Efectivo / Contado: ${nuevo_p_contado:,.2f}\n"
+                        f"• Tarjeta / Lista ({pct_tarjeta:g}%): ${nuevo_p_tarjeta:,.2f}"
+                    )
+                except Exception as ex:
+                    QMessageBox.warning(
+                        self,
+                        "Atención",
+                        f"Se aplicó el precio para la venta actual, pero ocurrió un error al actualizar la base de datos:\n{str(ex)}"
+                    )
+
+            self.actualizar_tabla()
 
     def resetear_estado_venta(self):
         self.carrito.clear()
