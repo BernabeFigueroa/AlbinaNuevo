@@ -8,9 +8,33 @@ from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout, QMessageBox, QApplication
 
-CURRENT_VERSION = "1.1.8"
+# Debe coincidir con el tag del binario que se distribuye.
+CURRENT_VERSION = "1.1.10"
 GITHUB_REPO = "BernabeFigueroa/AlbinaNuevo"  # Repositorio oficial para releases/binarios
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+APP_DATA_DIR = os.path.join(
+    os.getenv("LOCALAPPDATA") or os.path.expanduser("~"),
+    "AlbinaAccesorios"
+)
+INSTALLED_VERSION_FILE = os.path.join(APP_DATA_DIR, "installed_version.json")
+
+
+def get_installed_version() -> str:
+    """Devuelve la versión efectiva instalada, con respaldo en el binario actual.
+
+    El marcador se escribe sólo después de que el actualizador reemplaza el
+    ejecutable. Así, aunque una futura compilación olvide modificar la constante,
+    la aplicación no ofrecerá nuevamente la release que acaba de instalar.
+    """
+    installed = version.parse(CURRENT_VERSION)
+    try:
+        with open(INSTALLED_VERSION_FILE, "r", encoding="utf-8") as version_file:
+            saved_version = version.parse(json.load(version_file)["version"])
+            if saved_version > installed:
+                installed = saved_version
+    except (FileNotFoundError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        pass
+    return str(installed)
 
 class UpdateCheckerThread(QThread):
     update_available = pyqtSignal(dict)  # Emite datos del release si hay actualización
@@ -32,8 +56,10 @@ class UpdateCheckerThread(QThread):
                         self.no_update.emit()
                         return
 
+                    installed_version = get_installed_version()
+
                     # Comparar versiones de forma semántica
-                    if version.parse(tag_name) > version.parse(CURRENT_VERSION):
+                    if version.parse(tag_name) > version.parse(installed_version):
                         download_url = None
                         exe_size = 0
                         
@@ -60,6 +86,7 @@ class UpdateCheckerThread(QThread):
                         if download_url:
                             self.update_available.emit({
                                 "version": tag_name,
+                                "installed_version": installed_version,
                                 "download_url": download_url,
                                 "body": data.get("body", "Mejoras generales y correcciones de errores."),
                                 "size": exe_size
@@ -179,7 +206,7 @@ class UpdateDialog(QDialog):
 
         lbl_desc = QLabel(
             f"Se ha publicado una actualización para Albina Accesorios San Martín.\n"
-            f"Versión actual: v{CURRENT_VERSION} -> Nueva: v{self.release_info['version']}\n\n"
+            f"Versión actual: v{self.release_info['installed_version']} -> Nueva: v{self.release_info['version']}\n\n"
             f"Haga clic en 'Actualizar e Instalar' para descargar e iniciar la versión más reciente."
         )
         lbl_desc.setWordWrap(True)
@@ -231,7 +258,7 @@ class UpdateDialog(QDialog):
 
     def on_download_finished(self, new_exe_path):
         self.lbl_status.setText("Descarga finalizada. Aplicando actualización...")
-        apply_update_and_restart(new_exe_path)
+        apply_update_and_restart(new_exe_path, self.release_info["version"])
         self.accept()
 
     def on_download_error(self, error_msg):
@@ -241,7 +268,7 @@ class UpdateDialog(QDialog):
         self.btn_cancel.setEnabled(True)
 
 
-def apply_update_and_restart(new_exe_path):
+def apply_update_and_restart(new_exe_path, target_version: str):
     """
     Ejecuta el reemplazo seguro del ejecutable y vuelve a iniciar la app.
     Maneja procesos en ejecución y permisos en Windows.
@@ -257,6 +284,8 @@ def apply_update_and_restart(new_exe_path):
     temp_dir = tempfile.gettempdir()
     updater_bat = os.path.join(temp_dir, "update_albina.bat")
     backup_exe = current_exe + ".old"
+    # packaging normaliza el tag a una representación segura para el batch.
+    target_version = str(version.parse(target_version))
 
     bat_content = f"""@echo off
 chcp 65001 >nul
@@ -272,6 +301,7 @@ if exist "{backup_exe}" del /F /Q "{backup_exe}" >nul 2>&1
 
 :: 3. Reintentos de reemplazo
 set ATTEMPTS=0
+set UPDATE_SUCCESS=0
 :RETRY
 set /a ATTEMPTS+=1
 
@@ -279,7 +309,10 @@ move /Y "{current_exe}" "{backup_exe}" >nul 2>&1
 if %ERRORLEVEL% equ 0 goto DO_COPY
 
 copy /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
-if %ERRORLEVEL% equ 0 goto FINISH
+if %ERRORLEVEL% equ 0 (
+    set UPDATE_SUCCESS=1
+    goto FINISH
+)
 
 if %ATTEMPTS% lss 30 (
     timeout /t 1 /nobreak >nul
@@ -289,13 +322,21 @@ if %ATTEMPTS% lss 30 (
 
 :DO_COPY
 copy /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    move /Y "{new_exe_path}" "{current_exe}" >nul 2>&1
-)
+if %ERRORLEVEL% neq 0 goto ROLLBACK
+set UPDATE_SUCCESS=1
+goto FINISH
+
+:ROLLBACK
+if exist "{backup_exe}" move /Y "{backup_exe}" "{current_exe}" >nul 2>&1
+goto FAIL
 
 :FINISH
+if %UPDATE_SUCCESS% neq 1 goto FAIL
 if exist "{backup_exe}" del /F /Q "{backup_exe}" >nul 2>&1
 if exist "{new_exe_path}" del /F /Q "{new_exe_path}" >nul 2>&1
+
+if not exist "{APP_DATA_DIR}" mkdir "{APP_DATA_DIR}" >nul 2>&1
+echo {{"version":"{target_version}"}} > "{INSTALLED_VERSION_FILE}"
 
 echo Iniciando nueva version...
 start "" "{current_exe}"
@@ -303,6 +344,12 @@ start "" "{current_exe}"
 :: Limpiar el propio script batch
 (goto) 2>nul & del "%~f0"
 exit
+
+:FAIL
+echo No se pudo instalar la actualizacion.
+if exist "{new_exe_path}" del /F /Q "{new_exe_path}" >nul 2>&1
+(goto) 2>nul & del "%~f0"
+exit /b 1
 """
 
     try:

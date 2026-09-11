@@ -882,7 +882,7 @@ class POSView(QWidget):
             for item in self.carrito:
                 total_venta += item['cantidad'] * item['precio_unitario']
                 
-            if metodo_pago_seleccionado in ["EFECTIVO", "TRANSFERENCIA"]:
+            if metodo_pago_seleccionado in ["EFECTIVO", "TRANSFERENCIA", "MIXTO"]:
                 total_contado = 0.0
                 for item in self.carrito:
                     p_c = item.get('precio_contado', item['precio_unitario'])

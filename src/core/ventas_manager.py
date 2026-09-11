@@ -11,28 +11,24 @@ class VentasManager:
 
     @staticmethod
     def procesar_venta(cliente_id: int, metodo_pago: str, carrito: list, montos_mixto: dict = None):
-        sesion_caja = CajaManager.obtener_sesion_activa()
-        if not sesion_caja:
-            raise Exception("Debe abrir la caja antes de realizar una venta.")
+        if not carrito:
+            raise ValueError("No se puede procesar una venta sin artículos.")
 
-        subtotal = sum(item['cantidad'] * item['precio_unitario'] for item in carrito)
-        
-        supabase = get_supabase()
-        res_cliente = supabase.table('clientes').select('descuento_porcentaje').eq('id', cliente_id).execute()
-        pct_descuento_cliente = float(res_cliente.data[0].get('descuento_porcentaje', 0) if res_cliente.data else 0)
-
-        if metodo_pago in ['EFECTIVO', 'TRANSFERENCIA', 'MIXTO']:
-            total_contado = sum(item['cantidad'] * float(item.get('precio_contado', item['precio_unitario'])) for item in carrito)
-            descuento_cliente = total_contado * (pct_descuento_cliente / 100.0) if pct_descuento_cliente > 0 else 0.0
-            total = total_contado - descuento_cliente
-            descuento_total = subtotal - total
-        else:
-            descuento_cliente = subtotal * (pct_descuento_cliente / 100.0) if pct_descuento_cliente > 0 else 0.0
-            total = subtotal - descuento_cliente
-            descuento_total = descuento_cliente
-
-        user = AuthManager.get_current_user()
-        usuario_id = user.id if user else None
+        # La base de datos es la frontera transaccional: venta, detalle, stock,
+        # caja y cuenta corriente se confirman juntos o se revierten juntos.
+        # Sólo se envían los datos necesarios, nunca referencias de widgets/UI.
+        items = []
+        for item in carrito:
+            cantidad = float(item['cantidad'])
+            if cantidad <= 0:
+                raise ValueError("La cantidad de cada artículo debe ser mayor a cero.")
+            items.append({
+                'producto_id': item.get('producto_id'),
+                'promocion_id': item.get('promocion_id'),
+                'cantidad': cantidad,
+                'precio_unitario': float(item['precio_unitario']),
+                'precio_contado': float(item.get('precio_contado', item['precio_unitario']))
+            })
 
         # Detectar si en el carrito hubo modificación manual de precios
         items_modificados = [
@@ -45,91 +41,28 @@ class VentasManager:
             if len(info_modificado) > 100:
                 info_modificado = info_modificado[:97] + "..."
 
-        # 1. Crear registro de venta
-        venta_data = {
-            'cliente_id': cliente_id,
-            'caja_sesion_id': sesion_caja['id'],
-            'usuario_id': usuario_id,
-            'subtotal': subtotal,
-            'descuento_total': descuento_total,
-            'total': total,
-            'metodo_pago': metodo_pago,
-            'nro_comprobante_afip': info_modificado,
-            'estado': 'COMPLETADA'
-        }
-        res_venta = supabase.table('ventas').insert(venta_data).execute()
-        venta_id = res_venta.data[0]['id']
+        supabase = get_supabase()
+        response = supabase.rpc('procesar_venta_atomica', {
+            'p_cliente_id': cliente_id,
+            'p_metodo_pago': metodo_pago,
+            'p_carrito': items,
+            'p_montos_mixto': montos_mixto,
+            'p_nota_auditoria': info_modificado
+        }).execute()
 
-        # 2. Registrar detalles y descontar stock
-        for item in carrito:
-            # Obtener costo unitario
-            costo_unit = 0.0
-            if item.get('producto_id'):
-                res_prod = supabase.table('productos').select('costo_final, stock_actual').eq('id', item['producto_id']).execute()
-                if res_prod.data:
-                    costo_unit = res_prod.data[0].get('costo_final', 0.0)
-                    nuevo_stock = res_prod.data[0]['stock_actual'] - item['cantidad']
-                    supabase.table('productos').update({'stock_actual': nuevo_stock}).eq('id', item['producto_id']).execute()
-            
-            # Determinar precio unitario efectivo cobrado según medio de pago
-            if metodo_pago in ['EFECTIVO', 'TRANSFERENCIA', 'MIXTO']:
-                p_unit_efectivo = float(item.get('precio_contado', item['precio_unitario']))
-            else:
-                p_unit_efectivo = float(item['precio_unitario'])
-                
-            subt_item = item['cantidad'] * p_unit_efectivo
-            
-            detalle_data = {
-                'venta_id': venta_id,
-                'producto_id': item.get('producto_id'),
-                'cantidad': item['cantidad'],
-                'precio_unitario': p_unit_efectivo,
-                'costo_unitario': costo_unit,
-                'subtotal': subt_item
-            }
-            supabase.table('ventas_detalle').insert(detalle_data).execute()
+        if not response.data:
+            raise RuntimeError("La base de datos no devolvió el resultado de la venta.")
 
-        # 3. Registrar en movimientos de caja
-        if metodo_pago == 'MIXTO' and montos_mixto:
-            for mp, monto in montos_mixto.items():
-                if monto > 0:
-                    mov_data = {
-                        'caja_sesion_id': sesion_caja['id'],
-                        'tipo': 'VENTA',
-                        'monto': monto,
-                        'metodo_pago': mp,
-                        'descripcion': f"Venta #{venta_id} (Mixto)"
-                    }
-                    supabase.table('caja_movimientos').insert(mov_data).execute()
-        elif metodo_pago != 'FIADO / CTA. CTE.':
-            mov_data = {
-                'caja_sesion_id': sesion_caja['id'],
-                'tipo': 'VENTA',
-                'monto': total,
-                'metodo_pago': metodo_pago,
-                'descripcion': f"Venta #{venta_id}"
-            }
-            supabase.table('caja_movimientos').insert(mov_data).execute()
-        else:
-            # Registrar deuda en Cta Cte
-            cta_data = {
-                'cliente_id': cliente_id,
-                'caja_sesion_id': sesion_caja['id'],
-                'venta_id': venta_id,
-                'tipo': 'DEUDA',
-                'monto': total,
-                'detalle': f"Venta Fiada #{venta_id}"
-            }
-            supabase.table('cta_cte_movimientos').insert(cta_data).execute()
+        resultado = response.data[0]
 
         # 4. Invalidar caché de productos para que la grilla refleje el stock actualizado
         DataCache.invalidate_productos()
 
         return {
-            "venta_id": venta_id,
-            "subtotal": subtotal,
-            "descuento": descuento_total,
-            "total": total
+            "venta_id": resultado['venta_id'],
+            "subtotal": float(resultado['subtotal']),
+            "descuento": float(resultado['descuento']),
+            "total": float(resultado['total'])
         }
 
     @staticmethod
