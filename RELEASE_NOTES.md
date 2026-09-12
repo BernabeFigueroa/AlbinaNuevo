@@ -1,0 +1,2 @@
+- Se agregó la opción para incluir artículos provisorios en una venta.
+- Corrección de visualización en la tabla de clientes.

@@ -2,6 +2,7 @@ from src.db.database import get_supabase
 from src.core.caja_manager import CajaManager
 from src.core.auth_manager import AuthManager
 from src.core.cache_manager import DataCache
+from math import isfinite
 
 class VentasManager:
     @staticmethod
@@ -20,14 +21,26 @@ class VentasManager:
         items = []
         for item in carrito:
             cantidad = float(item['cantidad'])
-            if cantidad <= 0:
+            if not isfinite(cantidad) or cantidad <= 0:
                 raise ValueError("La cantidad de cada artículo debe ser mayor a cero.")
+            es_provisorio = item.get('es_provisorio', False)
+            descripcion = str(item.get('nombre') or '').strip()
+            costo = float(item.get('costo_unitario', 0)) if es_provisorio else 0
+            precio = float(item['precio_unitario'])
+            contado = float(item.get('precio_contado', precio))
+            if any(not isfinite(valor) or valor < 0 for valor in (precio, contado, costo)):
+                raise ValueError("Los precios y el costo deben ser números válidos mayores o iguales a cero.")
+            if es_provisorio and (not descripcion or item.get('producto_id') is not None or item.get('promocion_id') is not None):
+                raise ValueError("El artículo provisorio debe tener descripción y no estar vinculado al stock ni a una promoción.")
             items.append({
                 'producto_id': item.get('producto_id'),
                 'promocion_id': item.get('promocion_id'),
                 'cantidad': cantidad,
-                'precio_unitario': float(item['precio_unitario']),
-                'precio_contado': float(item.get('precio_contado', item['precio_unitario']))
+                'precio_unitario': precio,
+                'precio_contado': contado,
+                'es_provisorio': es_provisorio,
+                'descripcion': descripcion,
+                'costo_unitario': costo,
             })
 
         # Detectar si en el carrito hubo modificación manual de precios
@@ -42,6 +55,15 @@ class VentasManager:
                 info_modificado = info_modificado[:97] + "..."
 
         supabase = get_supabase()
+        if any(item['es_provisorio'] for item in items):
+            # Un RPC anterior ignora claves JSON desconocidas: impedir ventas sin trazabilidad.
+            try:
+                supabase.table('ventas').select('tiene_provisorios').limit(1).execute()
+            except Exception as exc:
+                raise RuntimeError(
+                    "No se pudo verificar el soporte de artículos provisorios. "
+                    "Verifique la conexión y aplique la migración 20260912_articulos_provisorios.sql antes de venderlos."
+                ) from exc
         response = supabase.rpc('procesar_venta_atomica', {
             'p_cliente_id': cliente_id,
             'p_metodo_pago': metodo_pago,
@@ -68,13 +90,14 @@ class VentasManager:
     @staticmethod
     def get_detalles_venta(venta_id: int):
         supabase = get_supabase()
-        res = supabase.table('ventas_detalle').select('cantidad, precio_unitario, subtotal, productos(nombre)').eq('venta_id', venta_id).execute()
+        res = supabase.table('ventas_detalle').select('cantidad, precio_unitario, subtotal, descripcion, es_provisorio, productos(nombre)').eq('venta_id', venta_id).execute()
         
         resultado = []
         for d in res.data:
-            nombre = d['productos']['nombre'] if d.get('productos') else 'Artículo'
+            nombre = d.get('descripcion') or (d['productos']['nombre'] if d.get('productos') else 'Artículo')
             resultado.append({
                 'nombre': nombre,
+                'es_provisorio': bool(d.get('es_provisorio')),
                 'cantidad': d['cantidad'],
                 'precio_unitario': d['precio_unitario'],
                 'subtotal': d['subtotal']
@@ -83,7 +106,7 @@ class VentasManager:
         # Obtener información adicional de la venta (ej. observaciones o ajuste de precios)
         info_venta = {}
         try:
-            res_v = supabase.table('ventas').select('nro_comprobante_afip, metodo_pago, fecha').eq('id', venta_id).execute()
+            res_v = supabase.table('ventas').select('nro_comprobante_afip, tiene_provisorios, metodo_pago, fecha').eq('id', venta_id).execute()
             if res_v.data:
                 info_venta = res_v.data[0]
         except Exception:

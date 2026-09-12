@@ -108,13 +108,35 @@ class ClientesView(QWidget):
         for p in clientes:
             row = self.tabla.rowCount()
             self.tabla.insertRow(row)
-            self.tabla.setItem(row, 0, QTableWidgetItem(str(p['id'])))
-            self.tabla.setItem(row, 1, QTableWidgetItem(p['nombre']))
-            self.tabla.setItem(row, 2, QTableWidgetItem(p['cuit'] or ""))
-            self.tabla.setItem(row, 3, QTableWidgetItem(p['telefono'] or ""))
-            self.tabla.setItem(row, 4, QTableWidgetItem(f"{p['descuento_porcentaje']}%"))
+            
+            item_id = QTableWidgetItem(str(p['id']))
+            item_id.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.tabla.setItem(row, 0, item_id)
+            
+            self.tabla.setItem(row, 1, QTableWidgetItem(p.get('nombre') or ""))
+            
+            item_cuit = QTableWidgetItem(p.get('cuit') or "")
+            item_cuit.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.tabla.setItem(row, 2, item_cuit)
+            
+            item_tel = QTableWidgetItem(p.get('telefono') or "")
+            item_tel.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.tabla.setItem(row, 3, item_tel)
+            
+            self.tabla.setItem(row, 4, QTableWidgetItem(p.get('domicilio') or ""))
+            
+            limite_val = p.get('limite', 0.0) or 0.0
+            item_limite = QTableWidgetItem(f"${float(limite_val):,.2f}")
+            item_limite.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.tabla.setItem(row, 5, item_limite)
+            
+            desc_val = p.get('descuento_porcentaje', 0.0) or 0.0
+            item_desc = QTableWidgetItem(f"{float(desc_val):.1f}%")
+            item_desc.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.tabla.setItem(row, 6, item_desc)
+            
             # Keep raw data for selection
-            self.tabla.item(row, 0).setData(Qt.ItemDataRole.UserRole, p)
+            item_id.setData(Qt.ItemDataRole.UserRole, p)
 
     def limpiar_form(self):
         self.cliente_id_actual = None
@@ -123,7 +145,8 @@ class ClientesView(QWidget):
         self.txt_telefono.clear()
         self.txt_domicilio.clear()
         self.cb_iva.setCurrentIndex(0)
-        self.txt_descuento.setText("0.0")
+        self.txt_limite.setText("0.00")
+        self.txt_descuento.setText("0")
         self.btn_eliminar.setEnabled(False)
         self.txt_nombre.setFocus()
 
@@ -136,6 +159,8 @@ class ClientesView(QWidget):
         self.txt_telefono.setText(p['telefono'] or "")
         self.txt_domicilio.setText(p['domicilio'] or "")
         self.cb_iva.setCurrentText(p['condicion_iva'] or "Consumidor Final")
+        limite_val = p.get('limite', 0.0) or 0.0
+        self.txt_limite.setText(f"{float(limite_val):.2f}")
         self.txt_descuento.setText(str(p['descuento_porcentaje'] or 0.0))
         
         self.btn_eliminar.setEnabled(self.cliente_id_actual != 1)

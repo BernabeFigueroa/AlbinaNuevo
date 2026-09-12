@@ -9,7 +9,7 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout, QMessageBox, QApplication
 
 # Debe coincidir con el tag del binario que se distribuye.
-CURRENT_VERSION = "1.1.10"
+CURRENT_VERSION = "1.1.11"
 GITHUB_REPO = "BernabeFigueroa/AlbinaNuevo"  # Repositorio oficial para releases/binarios
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 APP_DATA_DIR = os.path.join(
@@ -149,7 +149,7 @@ class UpdateDialog(QDialog):
         super().__init__(parent)
         self.release_info = release_info
         self.setWindowTitle("Actualización Disponible - Albina Accesorios")
-        self.setFixedSize(480, 260)
+        self.setFixedWidth(520)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint)
         self.setup_ui()
 
@@ -206,12 +206,31 @@ class UpdateDialog(QDialog):
 
         lbl_desc = QLabel(
             f"Se ha publicado una actualización para Albina Accesorios San Martín.\n"
-            f"Versión actual: v{self.release_info['installed_version']} -> Nueva: v{self.release_info['version']}\n\n"
-            f"Haga clic en 'Actualizar e Instalar' para descargar e iniciar la versión más reciente."
+            f"Versión actual: v{self.release_info['installed_version']} -> Nueva: v{self.release_info['version']}"
         )
         lbl_desc.setWordWrap(True)
         lbl_desc.setStyleSheet("color: #7A7067; font-size: 12px;")
         layout.addWidget(lbl_desc)
+
+        # Mostrar novedades del release si existen
+        body_text = self.release_info.get("body", "").strip()
+        if body_text:
+            lbl_novedades_header = QLabel("¿Qué hay de nuevo?")
+            lbl_novedades_header.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+            lbl_novedades_header.setStyleSheet("color: #2C2520; margin-top: 4px;")
+            layout.addWidget(lbl_novedades_header)
+
+            lbl_novedades = QLabel(body_text)
+            lbl_novedades.setWordWrap(True)
+            lbl_novedades.setStyleSheet("""
+                background-color: #FFFFFF;
+                border: 1px solid #E5DFD5;
+                border-radius: 8px;
+                padding: 10px;
+                color: #2C2520;
+                font-size: 12px;
+            """)
+            layout.addWidget(lbl_novedades)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)

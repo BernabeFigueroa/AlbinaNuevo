@@ -16,6 +16,7 @@ from src.core.configuracion_manager import ConfiguracionManager
 from src.utils.impresion_ticket import ImpresoraTicket
 from src.ui.buscador_productos import BuscadorProductosDialog
 from src.ui.buscador_clientes import BuscadorClientesDialog
+from src.ui.articulo_provisorio_dialog import ArticuloProvisorioDialog
 
 
 class DialogoModificarPrecio(QDialog):
@@ -23,7 +24,7 @@ class DialogoModificarPrecio(QDialog):
     Modal boutique cuando el usuario modifica el precio unitario de un producto en el POS.
     Pregunta si el cambio aplica solo para esta venta o si actualiza el precio en la base de datos.
     """
-    def __init__(self, producto_nombre: str, precio_anterior: float, precio_nuevo: float, parent=None):
+    def __init__(self, producto_nombre: str, precio_anterior: float, precio_nuevo: float, parent=None, permitir_permanente=True):
         super().__init__(parent)
         self.setWindowTitle("Modificación de Precio")
         self.setMinimumWidth(460)
@@ -124,6 +125,7 @@ class DialogoModificarPrecio(QDialog):
             }
         """)
         btn_actualizar_bd.clicked.connect(self._elegir_actualizar_bd)
+        btn_actualizar_bd.setVisible(permitir_permanente)
         btn_layout.addWidget(btn_actualizar_bd)
         
         # Botón Cancelar
@@ -292,6 +294,17 @@ class POSView(QWidget):
         self.txt_codigo.setMinimumHeight(40)
         self.txt_codigo.returnPressed.connect(self.buscar_y_agregar_producto)
         search_bar_layout.addWidget(self.txt_codigo)
+        self.btn_articulo_provisorio = QPushButton("+ Artículo")
+        self.btn_articulo_provisorio.setToolTip("Agregar un artículo provisorio a esta venta, con opción de guardarlo como producto permanente")
+        self.btn_articulo_provisorio.setFixedSize(110, 30)
+        self.btn_articulo_provisorio.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_articulo_provisorio.setStyleSheet("""
+            QPushButton { background-color: #FAF8F5; color: #7A7067;
+                border: 1px solid #E5DFD5; border-radius: 6px; font-size: 11px; }
+            QPushButton:hover { background-color: #F4EFE6; border-color: #B09886; }
+        """)
+        self.btn_articulo_provisorio.clicked.connect(self.agregar_articulo_provisorio)
+        search_bar_layout.addWidget(self.btn_articulo_provisorio, 0, Qt.AlignmentFlag.AlignVCenter)
         layout_principal.addLayout(search_bar_layout, 0)
 
         # --- 3. GRILLA DE PRODUCTOS (EXPANDIBLE) ---
@@ -418,6 +431,16 @@ class POSView(QWidget):
         QShortcut(QKeySequence("F3"), self, self.abrir_buscador_clientes_f3)
         QShortcut(QKeySequence("Delete"), self, self.eliminar_fila)
 
+        self.txt_codigo.setFocus()
+
+    def agregar_articulo_provisorio(self):
+        dialogo = ArticuloProvisorioDialog(self)
+        if dialogo.exec() == QDialog.DialogCode.Accepted and dialogo.item:
+            # Cada alta conserva su identidad: no agrupar artículos con producto_id=None.
+            self.carrito.append(dialogo.item)
+            if not dialogo.item['es_provisorio']:
+                self.procesar_promociones()
+            self.actualizar_tabla()
         self.txt_codigo.setFocus()
 
     def eliminar_fila(self):
@@ -687,6 +710,8 @@ class POSView(QWidget):
             # Crear items
             item_cod = QTableWidgetItem(item['codigo_barras'])
             item_desc = QTableWidgetItem(item['nombre'])
+            if item.get('es_provisorio'):
+                item_desc.setToolTip("Artículo provisorio: sólo para esta venta, sin movimiento de stock.")
             item_talle = QTableWidgetItem(item.get('talle') or "")
             item_cant = QTableWidgetItem(f"{item['cantidad']:g}")
             item_pu = QTableWidgetItem(f"{p_unitario_actual:.2f}")
@@ -795,7 +820,8 @@ class POSView(QWidget):
                 producto_nombre=carrito_item['nombre'],
                 precio_anterior=p_actual_pantalla,
                 precio_nuevo=nuevo_precio,
-                parent=self
+                parent=self,
+                permitir_permanente=bool(carrito_item.get('producto_id')),
             )
             dialogo.exec()
 

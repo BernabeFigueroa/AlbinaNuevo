@@ -1,4 +1,5 @@
 from datetime import datetime, timezone, timedelta
+from html import escape
 try:
     import zoneinfo
     tz_ar = zoneinfo.ZoneInfo("America/Argentina/Buenos_Aires")
@@ -283,7 +284,7 @@ class ReportesView(QWidget):
         
         # Grilla
         self.tabla_ventas = QTableWidget(0, 7)
-        self.tabla_ventas.setHorizontalHeaderLabels(["Factura Nº", "Fecha y Hora", "Cliente", "Vendedor", "Medio Pago", "Total", "Ajuste Precio"])
+        self.tabla_ventas.setHorizontalHeaderLabels(["Factura Nº", "Fecha y Hora", "Cliente", "Vendedor", "Medio Pago", "Total", "Avisos"])
         self.tabla_ventas.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.tabla_ventas.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla_ventas.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -548,12 +549,19 @@ class ReportesView(QWidget):
             item_total.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.tabla_ventas.setItem(row, 5, item_total)
 
-            # Columna 6: Alerta de Ajuste de Precio
+            # Compartir la columna de avisos, conservando ambas señales de auditoría.
+            avisos, detalles_aviso = [], []
             if v.get('precio_modificado'):
-                item_alerta = QTableWidgetItem("⚠️ Modificado")
+                avisos.append("Precio modificado")
+                detalles_aviso.append(v.get('detalle_modificacion') or "Precio editado manualmente en la venta")
+            if v.get('tiene_provisorios'):
+                avisos.append("Provisorio")
+                detalles_aviso.append("Incluye artículos provisorios que no pertenecen al stock. Abra el detalle para identificarlos.")
+            if avisos:
+                item_alerta = QTableWidgetItem("⚠ " + " / ".join(avisos))
                 item_alerta.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 item_alerta.setForeground(Qt.GlobalColor.red)
-                item_alerta.setToolTip(v.get('detalle_modificacion') or "Precio editado manualmente en la venta")
+                item_alerta.setToolTip("\n".join(detalles_aviso))
             else:
                 item_alerta = QTableWidgetItem("Normal")
                 item_alerta.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -741,9 +749,12 @@ class ReportesView(QWidget):
             html_aviso = f"""
             <div style="background-color: #FFF3CD; border: 1px solid #FFEBAA; border-radius: 6px; padding: 10px; margin-bottom: 15px; color: #856404; font-size: 12.5px;">
                 <b>⚠️ AVISO DE AUDITORÍA:</b> Hubo modificación manual de precio en esta venta.<br>
-                <span style="font-size: 11.5px; color: #66512c;">{nota_comprobante}</span>
+                <span style="font-size: 11.5px; color: #66512c;">{escape(str(nota_comprobante))}</span>
             </div>
             """
+
+        if info_venta.get('tiene_provisorios') or any(d.get('es_provisorio') for d in detalles):
+            html_aviso += '<p style="color: #856404;"><b>⚠ Artículos provisorios:</b> esta venta incluye artículos sin movimiento de stock.</p>'
 
         html = f"""
         {html_aviso}
@@ -754,7 +765,7 @@ class ReportesView(QWidget):
         for d in detalles:
             html += f"""
             <tr>
-                <td style="font-size: 14px; padding-bottom: 8px;">{d['cantidad']}x <b style="color: #000000;">{d['nombre']}</b><br><span style="color: #7f849c; font-size: 12px;">${d['precio_unitario']:.2f} c/u</span></td>
+                <td style="font-size: 14px; padding-bottom: 8px;">{d['cantidad']}x <b style="color: #000000;">{escape(str(d['nombre']))}</b>{' — PROVISORIO (sin stock)' if d.get('es_provisorio') else ''}<br><span style="color: #7f849c; font-size: 12px;">${d['precio_unitario']:.2f} c/u</span></td>
                 <td align="right" valign="top" style="color: #000000; font-size: 14px; padding-bottom: 8px;">${d['subtotal']:.2f}</td>
             </tr>
             """

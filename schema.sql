@@ -107,6 +107,7 @@ CREATE TABLE ventas (
     tipo_comprobante TEXT DEFAULT 'TICKET',
     estado_afip TEXT DEFAULT 'PENDIENTE',
     nro_comprobante_afip TEXT,
+    tiene_provisorios BOOLEAN NOT NULL DEFAULT false,
     estado TEXT DEFAULT 'COMPLETADA'
 );
 
@@ -125,6 +126,8 @@ CREATE TABLE ventas_detalle (
     venta_id BIGINT NOT NULL REFERENCES ventas(id),
     producto_id BIGINT REFERENCES productos(id),
     promocion_id BIGINT REFERENCES promociones(id),
+    es_provisorio BOOLEAN NOT NULL DEFAULT false,
+    descripcion TEXT,
     cantidad NUMERIC(10,2) NOT NULL,
     precio_unitario NUMERIC(10,2) NOT NULL,
     costo_unitario NUMERIC(10,2) NOT NULL DEFAULT 0.0,

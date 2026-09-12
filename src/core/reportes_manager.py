@@ -23,7 +23,7 @@ class ReportesManager:
         
         supabase = get_supabase()
         
-        query = supabase.table('ventas').select('id, fecha, total, metodo_pago, nro_comprobante_afip, clientes(nombre), usuarios(nombre, username)').neq('estado', 'CANCELADA').gte('fecha', desde).lte('fecha', hasta)
+        query = supabase.table('ventas').select('id, fecha, total, metodo_pago, nro_comprobante_afip, tiene_provisorios, clientes(nombre), usuarios(nombre, username)').neq('estado', 'CANCELADA').gte('fecha', desde).lte('fecha', hasta)
         
         if metodo_pago:
             query = query.eq('metodo_pago', metodo_pago)
@@ -67,6 +67,7 @@ class ReportesManager:
                 'cliente': v['clientes']['nombre'] if v.get('clientes') else 'Consumidor Final',
                 'vendedor': vendedor,
                 'precio_modificado': tiene_mod_precio,
+                'tiene_provisorios': bool(v.get('tiene_provisorios')),
                 'detalle_modificacion': nota_mod if tiene_mod_precio else None
             })
             
@@ -426,4 +427,3 @@ class ReportesManager:
                     writer.writerow(["TOTAL SECCIÓN", "", "", "", f"{subtot:.2f}"])
                     writer.writerow([])
             return True
-
