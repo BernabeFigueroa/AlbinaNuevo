@@ -34,7 +34,12 @@ class DeudasProveedoresView(QWidget):
     def __init__(self):
         super().__init__()
         self.init_ui()
-        self.cargar_proveedores()
+        self.cargar_proveedores_async()
+
+    def cargar_proveedores_async(self):
+        from src.utils.async_worker import run_async
+        run_async(ProveedoresManager.get_all, on_result=self._mostrar_proveedores,
+                  on_error=lambda error: print(f"Error cargando proveedores: {error}"))
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -93,9 +98,11 @@ class DeudasProveedoresView(QWidget):
         layout.addWidget(self.tabla)
 
     def cargar_proveedores(self):
+        self.cargar_proveedores_async()
+
+    def _mostrar_proveedores(self, proveedores):
         self.cb_proveedores.blockSignals(True)
         self.cb_proveedores.clear()
-        proveedores = ProveedoresManager.get_all()
         for p in proveedores:
             self.cb_proveedores.addItem(f"{p['nombre']}", p['id'])
         self.cb_proveedores.blockSignals(False)
@@ -107,15 +114,25 @@ class DeudasProveedoresView(QWidget):
             self.lbl_saldo.setText("Saldo Deuda: $0.00")
             self.tabla.setRowCount(0)
             return
-            
-        saldo = CtaCteProveedoresManager.get_saldo(proveedor_id)
+        from src.utils.async_worker import run_async
+
+        def obtener_datos():
+            return (CtaCteProveedoresManager.get_saldo(proveedor_id),
+                    CtaCteProveedoresManager.get_historial(proveedor_id))
+
+        run_async(obtener_datos,
+                  on_result=lambda datos: self._mostrar_datos_proveedor(proveedor_id, *datos),
+                  on_error=lambda error: print(f"Error cargando deuda de proveedor: {error}"))
+
+    def _mostrar_datos_proveedor(self, proveedor_id, saldo, historial):
+        if self.cb_proveedores.currentData() != proveedor_id:
+            return
         self.lbl_saldo.setText(f"Deuda Pendiente: ${saldo:.2f}")
         if saldo > 0:
             self.lbl_saldo.setStyleSheet("color: #D99890;")
         else:
             self.lbl_saldo.setStyleSheet("color: #B09886;")
             
-        historial = CtaCteProveedoresManager.get_historial(proveedor_id)
         self.tabla.setRowCount(0)
         for h in historial:
             row = self.tabla.rowCount()

@@ -295,7 +295,13 @@ class CajaView(QWidget):
         super().__init__()
         self.sesion_activa = None
         self.init_ui()
-        self.actualizar_estado()
+        self.actualizar_estado_async()
+
+    def actualizar_estado_async(self):
+        """Consulta el estado inicial sin frenar la apertura de Caja."""
+        from src.utils.async_worker import run_async
+        run_async(CajaManager.obtener_sesion_activa, on_result=self._aplicar_estado,
+                  on_error=lambda error: print(f"Error cargando caja: {error}"))
 
     def crear_tarjeta(self, titulo=None):
         frame = QFrame()
@@ -542,7 +548,10 @@ class CajaView(QWidget):
         layout_principal.addLayout(content_layout)
 
     def actualizar_estado(self):
-        self.sesion_activa = CajaManager.obtener_sesion_activa()
+        self._aplicar_estado(CajaManager.obtener_sesion_activa())
+
+    def _aplicar_estado(self, sesion):
+        self.sesion_activa = sesion
         
         if self.sesion_activa:
             fecha_apertura_limpia = formatear_fecha_ar(self.sesion_activa.get('fecha_apertura'))
@@ -552,7 +561,7 @@ class CajaView(QWidget):
             self.frame_movimientos.setVisible(True)
             self.frame_tabla.setVisible(True)
             self.frame_cierre.setVisible(True)
-            self.cargar_resumen()
+            self.cargar_resumen_async()
         else:
             self.lbl_estado_caja.setText("○ CERRADA")
             self.lbl_estado_caja.setStyleSheet("color: #D99890;")
@@ -560,6 +569,19 @@ class CajaView(QWidget):
             self.frame_movimientos.setVisible(False)
             self.frame_tabla.setVisible(False)
             self.frame_cierre.setVisible(False)
+
+    def cargar_resumen_async(self):
+        if not self.sesion_activa:
+            return
+        from src.utils.async_worker import run_async
+        caja_id = self.sesion_activa['id']
+
+        def obtener_resumen():
+            return CajaManager.obtener_resumen(caja_id), CajaManager.obtener_movimientos(caja_id)
+
+        run_async(obtener_resumen,
+                  on_result=lambda datos: self._mostrar_resumen(caja_id, *datos),
+                  on_error=lambda error: print(f"Error cargando resumen de caja: {error}"))
 
     def abrir_caja(self):
         try:
@@ -595,8 +617,13 @@ class CajaView(QWidget):
     def cargar_resumen(self):
         if not self.sesion_activa:
             return
-            
         resumen = CajaManager.obtener_resumen(self.sesion_activa['id'])
+        movimientos = CajaManager.obtener_movimientos(self.sesion_activa['id'])
+        self._mostrar_resumen(self.sesion_activa['id'], resumen, movimientos)
+
+    def _mostrar_resumen(self, caja_id, resumen, movimientos):
+        if not self.sesion_activa or self.sesion_activa['id'] != caja_id:
+            return
         
         for clave, lbl in self.lbl_valores.items():
             valor = resumen.get(clave, 0.0)
@@ -607,7 +634,6 @@ class CajaView(QWidget):
         
         # Cargar tabla de movimientos
         self.tabla_movs.setRowCount(0)
-        movimientos = CajaManager.obtener_movimientos(self.sesion_activa['id'])
         for m in movimientos:
             row = self.tabla_movs.rowCount()
             self.tabla_movs.insertRow(row)

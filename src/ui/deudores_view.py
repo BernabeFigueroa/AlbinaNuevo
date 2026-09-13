@@ -34,7 +34,12 @@ class DeudoresView(QWidget):
     def __init__(self):
         super().__init__()
         self.init_ui()
-        self.cargar_clientes()
+        self.cargar_clientes_async()
+
+    def cargar_clientes_async(self):
+        from src.utils.async_worker import run_async
+        run_async(ClientesManager.get_all, on_result=self._mostrar_clientes,
+                  on_error=lambda error: print(f"Error cargando deudores: {error}"))
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -111,9 +116,11 @@ class DeudoresView(QWidget):
             QMessageBox.critical(self, "Error", f"No se pudo cargar el detalle:\n{str(e)}")
 
     def cargar_clientes(self):
+        self.cargar_clientes_async()
+
+    def _mostrar_clientes(self, clientes):
         self.cb_clientes.blockSignals(True)
         self.cb_clientes.clear()
-        clientes = ClientesManager.get_all()
         for c in clientes:
             if c['id'] != 1: # Ignorar Consumidor Final
                 self.cb_clientes.addItem(f"{c['nombre']} (CUIT: {c['cuit']})", c['id'])
@@ -126,8 +133,18 @@ class DeudoresView(QWidget):
             self.lbl_saldo.setText("Saldo Pendiente: $0.00")
             self.tabla.setRowCount(0)
             return
-            
-        saldo = CtaCteManager.get_saldo(cliente_id)
+        from src.utils.async_worker import run_async
+
+        def obtener_datos():
+            return CtaCteManager.get_saldo(cliente_id), CtaCteManager.get_historial(cliente_id)
+
+        run_async(obtener_datos,
+                  on_result=lambda datos: self._mostrar_datos_cliente(cliente_id, *datos),
+                  on_error=lambda error: print(f"Error cargando cuenta corriente: {error}"))
+
+    def _mostrar_datos_cliente(self, cliente_id, saldo, historial):
+        if self.cb_clientes.currentData() != cliente_id:
+            return
         if saldo > 0:
             self.lbl_saldo.setText(f"Saldo Pendiente (Deuda): ${saldo:.2f}")
             self.lbl_saldo.setStyleSheet("color: #D99890;")
@@ -138,7 +155,6 @@ class DeudoresView(QWidget):
             self.lbl_saldo.setText(f"Saldo: $0.00")
             self.lbl_saldo.setStyleSheet("color: #000000;")
             
-        historial = CtaCteManager.get_historial(cliente_id)
         self.tabla.setRowCount(0)
         for h in historial:
             row = self.tabla.rowCount()

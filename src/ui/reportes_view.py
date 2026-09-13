@@ -97,6 +97,7 @@ class DialogoDetalleModerno(QDialog):
 class ReportesView(QWidget):
     def __init__(self):
         super().__init__()
+        self._filtros_reportes = None
         self.init_ui()
 
     def init_ui(self):
@@ -440,10 +441,14 @@ class ReportesView(QWidget):
         layout.addWidget(self.tabla_ganancias)
 
     def cargar_combo_vendedores(self):
+        from src.utils.async_worker import run_async
+        run_async(ReportesManager.get_vendedores, on_result=self._mostrar_vendedores,
+                  on_error=lambda error: print(f"Error cargando vendedores: {error}"))
+
+    def _mostrar_vendedores(self, vendedores):
         try:
             self.cb_vendedor.clear()
             self.cb_vendedor.addItem("TODOS", None)
-            vendedores = ReportesManager.get_vendedores()
             for v in vendedores:
                 nombre = v.get('nombre') or v.get('username') or 'Sin nombre'
                 self.cb_vendedor.addItem(nombre, v['id'])
@@ -466,6 +471,8 @@ class ReportesView(QWidget):
             self.cb_metodo_pago.hide()
             self.lbl_vendedor.hide()
             self.cb_vendedor.hide()
+        if self._filtros_reportes:
+            self.cargar_reporte_actual_async()
 
     def generar_reportes(self):
         try:
@@ -473,15 +480,59 @@ class ReportesView(QWidget):
             hasta = self.dt_hasta.date().toString("yyyy-MM-dd")
             usuario_id = self.cb_vendedor.currentData()
             
-            self.cargar_ventas(desde, hasta, usuario_id)
-            self.cargar_productos(desde, hasta)
-            self.cargar_rubros(desde, hasta)
-            self.cargar_cajas(desde, hasta, usuario_id)
-            self.cargar_alertas()
-            self.cargar_ganancias(desde, hasta, usuario_id)
+            metodo = self.cb_metodo_pago.currentText()
+            self._filtros_reportes = (desde, hasta, usuario_id, metodo)
+            self.cargar_reporte_actual_async()
         except Exception as e:
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Error al generar reportes", f"Ocurrió un error: {str(e)}")
+
+    def cargar_reporte_actual_async(self):
+        """Consulta solamente la pestaña visible, fuera del hilo de interfaz."""
+        if not self._filtros_reportes:
+            return
+        from src.utils.async_worker import run_async
+        desde, hasta, usuario_id, metodo = self._filtros_reportes
+        index = self.tabs.currentIndex()
+
+        def obtener_datos():
+            if index == 0:
+                return ReportesManager.get_ventas_por_fecha(
+                    desde, hasta, None if metodo == "TODOS" else metodo, usuario_id
+                )
+            if index == 1:
+                return ReportesManager.get_productos_mas_vendidos(desde, hasta)
+            if index == 2:
+                return ReportesManager.get_ventas_por_rubro(desde, hasta)
+            if index == 3:
+                cierres = ReportesManager.get_cierres_caja(desde, hasta, usuario_id)
+                for cierre in cierres:
+                    cierre['_esperado'] = CajaManager.obtener_resumen(cierre['id']).get('total_efectivo_esperado', 0.0)
+                return cierres
+            if index == 4:
+                return ReportesManager.get_alertas_reposicion()
+            return ReportesManager.get_reporte_ganancias(desde, hasta, usuario_id)
+
+        run_async(obtener_datos,
+                  on_result=lambda datos: self._mostrar_reporte(index, datos),
+                  on_error=lambda error: print(f"Error cargando reporte: {error}"))
+
+    def _mostrar_reporte(self, index, datos):
+        if self.tabs.currentIndex() != index:
+            return
+        desde, hasta, usuario_id, _metodo = self._filtros_reportes
+        if index == 0:
+            self.cargar_ventas(desde, hasta, usuario_id, data=datos)
+        elif index == 1:
+            self.cargar_productos(desde, hasta, data=datos)
+        elif index == 2:
+            self.cargar_rubros(desde, hasta, data=datos)
+        elif index == 3:
+            self.cargar_cajas(desde, hasta, usuario_id, data=datos)
+        elif index == 4:
+            self.cargar_alertas(data=datos)
+        else:
+            self.cargar_ganancias(desde, hasta, usuario_id, data=datos)
 
     def exportar_excel_declaracion(self):
         from PyQt6.QtWidgets import QFileDialog, QMessageBox
@@ -516,10 +567,11 @@ class ReportesView(QWidget):
             QMessageBox.critical(self, "Error de Exportación", f"No se pudo generar la declaración:\n{str(e)}")
 
 
-    def cargar_ventas(self, desde, hasta, usuario_id=None):
+    def cargar_ventas(self, desde, hasta, usuario_id=None, data=None):
         metodo = self.cb_metodo_pago.currentText()
         metodo_filtro = None if metodo == "TODOS" else metodo
-        data = ReportesManager.get_ventas_por_fecha(desde, hasta, metodo_filtro, usuario_id)
+        if data is None:
+            data = ReportesManager.get_ventas_por_fecha(desde, hasta, metodo_filtro, usuario_id)
         
         self.lbl_tot_efectivo.setText(f"${data['total_efectivo']:.2f}")
         self.lbl_tot_transferencia.setText(f"${data['total_transferencia']:.2f}")
@@ -568,8 +620,9 @@ class ReportesView(QWidget):
                 item_alerta.setForeground(Qt.GlobalColor.darkGray)
             self.tabla_ventas.setItem(row, 6, item_alerta)
 
-    def cargar_productos(self, desde, hasta):
-        data = ReportesManager.get_productos_mas_vendidos(desde, hasta)
+    def cargar_productos(self, desde, hasta, data=None):
+        if data is None:
+            data = ReportesManager.get_productos_mas_vendidos(desde, hasta)
         self.tabla_productos.setRowCount(0)
         for p in data:
             row = self.tabla_productos.rowCount()
@@ -579,8 +632,9 @@ class ReportesView(QWidget):
             self.tabla_productos.setItem(row, 2, QTableWidgetItem(str(p['cant_total'])))
             self.tabla_productos.setItem(row, 3, QTableWidgetItem(f"${p['recaudacion']:.2f}"))
 
-    def cargar_rubros(self, desde, hasta):
-        data = ReportesManager.get_ventas_por_rubro(desde, hasta)
+    def cargar_rubros(self, desde, hasta, data=None):
+        if data is None:
+            data = ReportesManager.get_ventas_por_rubro(desde, hasta)
         self.tabla_rubros.setRowCount(0)
         for r in data:
             row = self.tabla_rubros.rowCount()
@@ -602,8 +656,9 @@ class ReportesView(QWidget):
                 item_ganancia.setForeground(Qt.GlobalColor.red)
             self.tabla_rubros.setItem(row, 3, item_ganancia)
 
-    def cargar_cajas(self, desde, hasta, usuario_id=None):
-        data = ReportesManager.get_cierres_caja(desde, hasta, usuario_id)
+    def cargar_cajas(self, desde, hasta, usuario_id=None, data=None):
+        if data is None:
+            data = ReportesManager.get_cierres_caja(desde, hasta, usuario_id)
         self.tabla_caja.setRowCount(0)
         for c in data:
             row = self.tabla_caja.rowCount()
@@ -635,11 +690,13 @@ class ReportesView(QWidget):
             self.tabla_caja.setItem(row, 5, item_ini)
             
             # Obtener resumen para esperado y diferencia
-            try:
-                resumen = CajaManager.obtener_resumen(c['id'])
-                esperado = resumen.get('total_efectivo_esperado', 0.0)
-            except Exception:
-                esperado = float(c['monto_inicial'] or 0.0)
+            if '_esperado' in c:
+                esperado = c['_esperado']
+            else:
+                try:
+                    esperado = CajaManager.obtener_resumen(c['id']).get('total_efectivo_esperado', 0.0)
+                except Exception:
+                    esperado = float(c['monto_inicial'] or 0.0)
                 
             item_esp = QTableWidgetItem(f"${esperado:,.2f}")
             item_esp.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -669,8 +726,9 @@ class ReportesView(QWidget):
             self.tabla_caja.setItem(row, 7, item_dec)
             self.tabla_caja.setItem(row, 8, item_dif)
 
-    def cargar_alertas(self):
-        data = ReportesManager.get_alertas_reposicion()
+    def cargar_alertas(self, data=None):
+        if data is None:
+            data = ReportesManager.get_alertas_reposicion()
         self.tabla_alertas.setRowCount(0)
         for a in data:
             row = self.tabla_alertas.rowCount()
@@ -690,8 +748,9 @@ class ReportesView(QWidget):
             item_sugerido.setForeground(Qt.GlobalColor.green)
             self.tabla_alertas.setItem(row, 4, item_sugerido)
 
-    def cargar_ganancias(self, desde, hasta, usuario_id=None):
-        data = ReportesManager.get_reporte_ganancias(desde, hasta, usuario_id)
+    def cargar_ganancias(self, desde, hasta, usuario_id=None, data=None):
+        if data is None:
+            data = ReportesManager.get_reporte_ganancias(desde, hasta, usuario_id)
         totales = data['totales']
         
         ventas = totales['total_vendido']

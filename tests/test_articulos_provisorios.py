@@ -114,6 +114,14 @@ class ArticulosUITests(unittest.TestCase):
             self.assertEqual(dialogo.item['precio_tarjeta'], 120)
             crear.assert_not_called()
 
+    def test_precio_lista_se_calcula_con_recargo_configurado_y_admite_edicion(self):
+        with patch('src.ui.articulo_provisorio_dialog.ConfiguracionManager.get_recargo_tarjeta', return_value=40):
+            dialogo = ArticuloProvisorioDialog()
+            dialogo.precio_contado.setValue(100)
+            self.assertEqual(dialogo.precio_tarjeta.value(), 140)
+            dialogo.precio_tarjeta.setValue(135)
+            self.assertEqual(dialogo.precio_tarjeta.value(), 135)
+
     def test_cantidad_minima_respeta_precision_del_detalle(self):
         dialogo = ArticuloProvisorioDialog()
         dialogo.nombre.setText('Cinta')

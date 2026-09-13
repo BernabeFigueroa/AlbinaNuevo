@@ -12,7 +12,13 @@ class ClientesView(QWidget):
         super().__init__()
         self.cliente_id_actual = None
         self.init_ui()
-        self.cargar_grilla()
+        self.cargar_grilla_async()
+
+    def cargar_grilla_async(self):
+        """Carga la lista remota sin bloquear la apertura de la vista."""
+        from src.utils.async_worker import run_async
+        run_async(ClientesManager.get_all, on_result=self._mostrar_clientes,
+                  on_error=lambda error: print(f"Error cargando clientes: {error}"))
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -103,8 +109,10 @@ class ClientesView(QWidget):
         layout.addWidget(grid_widget, 1)
 
     def cargar_grilla(self):
+        self._mostrar_clientes(ClientesManager.get_all())
+
+    def _mostrar_clientes(self, clientes):
         self.tabla.setRowCount(0)
-        clientes = ClientesManager.get_all()
         for p in clientes:
             row = self.tabla.rowCount()
             self.tabla.insertRow(row)

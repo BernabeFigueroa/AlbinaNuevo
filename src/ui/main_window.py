@@ -149,8 +149,6 @@ class MainWindow(QMainWindow):
             if self.productos_view is None:
                 self.productos_view = ProductosView()
                 self.stacked_widget.addWidget(self.productos_view)
-            else:
-                self.productos_view.cargar_grilla(force_reload=True)
             self.stacked_widget.setCurrentWidget(self.productos_view)
             
         def show_categorias():

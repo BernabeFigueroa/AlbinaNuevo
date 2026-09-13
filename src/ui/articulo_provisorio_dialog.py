@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
 )
 
 from src.core.productos_manager import ProductosManager
+from src.core.configuracion_manager import ConfiguracionManager
 
 
 class ArticuloProvisorioDialog(QDialog):
@@ -30,8 +31,9 @@ class ArticuloProvisorioDialog(QDialog):
         form.addRow("Precio unitario contado:", self.precio_contado)
         form.addRow("Precio unitario tarjeta / lista:", self.precio_tarjeta)
         form.addRow("Costo unitario (0 si no tiene):", self.costo)
-        # Al comenzar se ofrece el mismo precio en ambos medios; luego son editables.
-        self.precio_contado.valueChanged.connect(self.precio_tarjeta.setValue)
+        # Al modificar el contado, sugerir el precio de lista según Ajustes.
+        # El campo de lista conserva edición manual para excepciones puntuales.
+        self.precio_contado.valueChanged.connect(self._actualizar_precio_lista)
         layout.addLayout(form)
         self.permanente = QCheckBox("Guardar también como producto permanente")
         layout.addWidget(self.permanente)
@@ -65,6 +67,11 @@ class ArticuloProvisorioDialog(QDialog):
         campo.setRange(minimo, maximo)
         campo.setValue(valor)
         return campo
+
+    def _actualizar_precio_lista(self, precio_contado):
+        """Calcula tarjeta/lista con el recargo vigente configurado en Ajustes."""
+        porcentaje = ConfiguracionManager.get_recargo_tarjeta()
+        self.precio_tarjeta.setValue(precio_contado * (1 + porcentaje / 100))
 
     def agregar(self):
         nombre = self.nombre.text().strip()

@@ -12,7 +12,13 @@ class ProveedoresView(QWidget):
         super().__init__()
         self.prov_id_actual = None
         self.init_ui()
-        self.cargar_grilla()
+        self.cargar_grilla_async()
+
+    def cargar_grilla_async(self):
+        """Carga la lista remota sin bloquear la apertura de la vista."""
+        from src.utils.async_worker import run_async
+        run_async(ProveedoresManager.get_all, on_result=self._mostrar_proveedores,
+                  on_error=lambda error: print(f"Error cargando proveedores: {error}"))
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -86,8 +92,10 @@ class ProveedoresView(QWidget):
         layout.addWidget(grid_widget, 1)
 
     def cargar_grilla(self):
+        self._mostrar_proveedores(ProveedoresManager.get_all())
+
+    def _mostrar_proveedores(self, provs):
         self.tabla.setRowCount(0)
-        provs = ProveedoresManager.get_all()
         for p in provs:
             row = self.tabla.rowCount()
             self.tabla.insertRow(row)

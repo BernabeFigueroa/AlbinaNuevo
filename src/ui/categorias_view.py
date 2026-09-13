@@ -12,7 +12,13 @@ class CategoriasView(QWidget):
         super().__init__()
         self.cat_id_actual = None
         self.init_ui()
-        self.cargar_grilla()
+        self.cargar_grilla_async()
+
+    def cargar_grilla_async(self):
+        """Carga la lista remota sin bloquear la apertura de la vista."""
+        from src.utils.async_worker import run_async
+        run_async(CategoriasManager.get_all, on_result=self._mostrar_categorias,
+                  on_error=lambda error: print(f"Error cargando categorías: {error}"))
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -76,8 +82,10 @@ class CategoriasView(QWidget):
         layout.addWidget(grid_widget, 1)
 
     def cargar_grilla(self):
+        self._mostrar_categorias(CategoriasManager.get_all())
+
+    def _mostrar_categorias(self, cats):
         self.tabla.setRowCount(0)
-        cats = CategoriasManager.get_all()
         for c in cats:
             row = self.tabla.rowCount()
             self.tabla.insertRow(row)

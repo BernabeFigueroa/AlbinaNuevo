@@ -20,8 +20,32 @@ class ProductosView(QWidget):
         super().__init__()
         self.producto_seleccionado_id = None
         self.init_ui()
-        self.cargar_combos()
-        self.cargar_grilla()
+        self.cargar_datos_iniciales()
+
+    def cargar_datos_iniciales(self):
+        """Obtiene el catálogo fuera del hilo de interfaz al abrir la vista."""
+        from src.core.cache_manager import DataCache
+        from src.utils.async_worker import run_async
+
+        def obtener_datos():
+            return (
+                DataCache.get_categorias(),
+                DataCache.get_proveedores(),
+                DataCache.get_productos(),
+            )
+
+        self.tabla.setUpdatesEnabled(False)
+        run_async(obtener_datos, on_result=self._mostrar_datos_iniciales,
+                  on_error=lambda error: self._terminar_carga_inicial(error))
+
+    def _mostrar_datos_iniciales(self, datos):
+        categorias, proveedores, productos = datos
+        self.cargar_combos(categorias, proveedores)
+        self.cargar_grilla(productos=productos)
+
+    def _terminar_carga_inicial(self, error):
+        self.tabla.setUpdatesEnabled(True)
+        print(f"Error cargando productos: {error}")
 
     def crear_seccion_frame(self):
         frame = QFrame()
@@ -35,7 +59,7 @@ class ProductosView(QWidget):
         """)
         return frame
 
-    def cargar_combos(self):
+    def cargar_combos(self, cats=None, provs=None):
         from src.core.cache_manager import DataCache
         # Guardar selecciones actuales
         cur_cat = self.cb_categoria.currentData() if hasattr(self, 'cb_categoria') else None
@@ -43,8 +67,8 @@ class ProductosView(QWidget):
         cur_filtro_cat = self.cb_filtro_categoria.currentData() if hasattr(self, 'cb_filtro_categoria') else None
         cur_filtro_prov = self.cb_filtro_proveedor.currentData() if hasattr(self, 'cb_filtro_proveedor') else None
 
-        cats = DataCache.get_categorias()
-        provs = DataCache.get_proveedores()
+        cats = DataCache.get_categorias() if cats is None else cats
+        provs = DataCache.get_proveedores() if provs is None else provs
 
         if hasattr(self, 'cb_categoria'):
             self.cb_categoria.blockSignals(True)
@@ -373,13 +397,16 @@ class ProductosView(QWidget):
         except ValueError:
             pass
 
-    def cargar_grilla(self, filtro="", force_reload=False):
+    def cargar_grilla(self, filtro="", force_reload=False, productos=None):
         try:
             from src.core.cache_manager import DataCache
             self.tabla.setUpdatesEnabled(False)
             self.tabla.setRowCount(0)
             incluir_inactivos = hasattr(self, 'chk_inactivos') and self.chk_inactivos.isChecked()
-            productos = DataCache.get_productos(incluir_inactivos=incluir_inactivos, force_reload=force_reload) or []
+            if productos is None:
+                productos = DataCache.get_productos(
+                    incluir_inactivos=incluir_inactivos, force_reload=force_reload
+                ) or []
             
             cat_filtro = self.cb_filtro_categoria.currentData() if hasattr(self, 'cb_filtro_categoria') else None
             prov_filtro = self.cb_filtro_proveedor.currentData() if hasattr(self, 'cb_filtro_proveedor') else None
