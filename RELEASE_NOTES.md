@@ -1,4 +1,4 @@
-# Albina Accesorios v1.1.14
+# Albina Accesorios v1.1.15
 
-- Corregido el aviso de actualización cuando las novedades son extensas.
-- Las notas ahora se muestran en un panel con desplazamiento, manteniendo siempre accesibles los botones **Actualizar e Instalar** y **Omitir por ahora**.
+- Corregido el error `PGRST201` al generar reportes después de incorporar la auditoría de ventas anuladas.
+- Los reportes vuelven a identificar correctamente al vendedor de cada venta.

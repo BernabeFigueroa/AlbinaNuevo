@@ -60,7 +60,7 @@ class ReportesManager:
         
         try:
             query = supabase.table('ventas').select(
-                'id, fecha, total, metodo_pago, nro_comprobante_afip, tiene_provisorios, estado, anulada_por, fecha_anulacion, motivo_anulacion, clientes(nombre), usuarios(nombre, username)'
+                'id, fecha, total, metodo_pago, nro_comprobante_afip, tiene_provisorios, estado, anulada_por, fecha_anulacion, motivo_anulacion, clientes(nombre), usuarios!ventas_usuario_id_fkey(nombre, username)'
             ).neq('estado', 'CANCELADA').gte('fecha', desde).lte('fecha', hasta)
             if metodo_pago:
                 query = query.eq('metodo_pago', metodo_pago)
@@ -70,7 +70,7 @@ class ReportesManager:
             ventas = res.data or []
         except Exception:
             query = supabase.table('ventas').select(
-                'id, fecha, total, metodo_pago, nro_comprobante_afip, tiene_provisorios, estado, clientes(nombre), usuarios(nombre, username)'
+                'id, fecha, total, metodo_pago, nro_comprobante_afip, tiene_provisorios, estado, clientes(nombre), usuarios!ventas_usuario_id_fkey(nombre, username)'
             ).neq('estado', 'CANCELADA').gte('fecha', desde).lte('fecha', hasta)
             if metodo_pago:
                 query = query.eq('metodo_pago', metodo_pago)
@@ -324,7 +324,7 @@ class ReportesManager:
         
         supabase = get_supabase()
         res = supabase.table('ventas').select(
-            'id, fecha, total, metodo_pago, clientes(nombre), usuarios(nombre, username)'
+            'id, fecha, total, metodo_pago, clientes(nombre), usuarios!ventas_usuario_id_fkey(nombre, username)'
         ).neq('estado', 'CANCELADA').neq('estado', 'ANULADA').gte('fecha', desde).lte('fecha', hasta).order('fecha', desc=False).execute()
         
         ventas = res.data
