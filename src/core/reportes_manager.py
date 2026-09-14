@@ -1,6 +1,42 @@
 from src.db.database import get_supabase
 from src.core.auth_manager import AuthManager
 from collections import defaultdict
+from datetime import datetime, timezone, timedelta
+
+try:
+    import zoneinfo
+    tz_ar = zoneinfo.ZoneInfo("America/Argentina/Buenos_Aires")
+except Exception:
+    tz_ar = timezone(timedelta(hours=-3))
+
+def get_rango_fechas_iso(fecha_desde: str, fecha_hasta: str):
+    """
+    Convierte cadenas 'YYYY-MM-DD' en rangos ISO 8601 con zona horaria de Argentina (UTC-3).
+    Garantiza que las ventas a partir de las 21:00 hs (00:00 UTC del día siguiente) queden en su día local correspondiente.
+    """
+    desde = f"{fecha_desde}T00:00:00-03:00"
+    hasta = f"{fecha_hasta}T23:59:59.999999-03:00"
+    return desde, hasta
+
+def obtener_fecha_local(fecha_str: str) -> str:
+    if not fecha_str:
+        return ""
+    try:
+        dt = datetime.fromisoformat(str(fecha_str).replace('Z', '+00:00'))
+        dt_local = dt.astimezone(tz_ar)
+        return dt_local.strftime("%Y-%m-%d")
+    except Exception:
+        return str(fecha_str)[:10]
+
+def formatear_fecha_ar(fecha_str: str) -> str:
+    if not fecha_str:
+        return "-"
+    try:
+        dt = datetime.fromisoformat(str(fecha_str).replace('Z', '+00:00'))
+        dt_local = dt.astimezone(tz_ar)
+        return dt_local.strftime("%d/%m/%Y %H:%M hs")
+    except Exception:
+        return str(fecha_str)[:16].replace("T", " ")
 
 class ReportesManager:
     @staticmethod
@@ -18,8 +54,7 @@ class ReportesManager:
     @staticmethod
     def get_ventas_por_fecha(fecha_desde: str, fecha_hasta: str, metodo_pago: str = None, usuario_id: str = None):
         ReportesManager._check_permission()
-        desde = f"{fecha_desde}T00:00:00"
-        hasta = f"{fecha_hasta}T23:59:59"
+        desde, hasta = get_rango_fechas_iso(fecha_desde, fecha_hasta)
         
         supabase = get_supabase()
         
@@ -81,8 +116,7 @@ class ReportesManager:
     @staticmethod
     def get_productos_mas_vendidos(fecha_desde: str, fecha_hasta: str):
         ReportesManager._check_permission()
-        desde = f"{fecha_desde}T00:00:00"
-        hasta = f"{fecha_hasta}T23:59:59"
+        desde, hasta = get_rango_fechas_iso(fecha_desde, fecha_hasta)
         
         supabase = get_supabase()
         res = supabase.table('ventas_detalle').select(
@@ -109,8 +143,7 @@ class ReportesManager:
     @staticmethod
     def get_cierres_caja(fecha_desde: str, fecha_hasta: str, usuario_id: str = None):
         ReportesManager._check_permission()
-        desde = f"{fecha_desde}T00:00:00"
-        hasta = f"{fecha_hasta}T23:59:59"
+        desde, hasta = get_rango_fechas_iso(fecha_desde, fecha_hasta)
         
         supabase = get_supabase()
         try:
@@ -152,8 +185,7 @@ class ReportesManager:
     @staticmethod
     def get_reporte_ganancias(fecha_desde: str, fecha_hasta: str, usuario_id: str = None):
         ReportesManager._check_permission()
-        desde = f"{fecha_desde}T00:00:00"
-        hasta = f"{fecha_hasta}T23:59:59"
+        desde, hasta = get_rango_fechas_iso(fecha_desde, fecha_hasta)
         
         supabase = get_supabase()
         query = supabase.table('ventas_detalle').select(
@@ -170,7 +202,7 @@ class ReportesManager:
         
         for d in res.data:
             fecha_str = d['ventas']['fecha']
-            dia = fecha_str[:10]
+            dia = obtener_fecha_local(fecha_str)
                 
             subt = float(d['subtotal'])
             costo = float(d['costo_unitario']) * float(d['cantidad'])
@@ -203,8 +235,7 @@ class ReportesManager:
     @staticmethod
     def get_ventas_por_rubro(fecha_desde: str, fecha_hasta: str):
         ReportesManager._check_permission()
-        desde = f"{fecha_desde}T00:00:00"
-        hasta = f"{fecha_hasta}T23:59:59"
+        desde, hasta = get_rango_fechas_iso(fecha_desde, fecha_hasta)
         
         supabase = get_supabase()
         res = supabase.table('ventas_detalle').select(
@@ -241,8 +272,7 @@ class ReportesManager:
     @staticmethod
     def generar_excel_declaracion_ventas(fecha_desde: str, fecha_hasta: str, filepath: str):
         ReportesManager._check_permission()
-        desde = f"{fecha_desde}T00:00:00"
-        hasta = f"{fecha_hasta}T23:59:59"
+        desde, hasta = get_rango_fechas_iso(fecha_desde, fecha_hasta)
         
         supabase = get_supabase()
         res = supabase.table('ventas').select(
@@ -263,13 +293,8 @@ class ReportesManager:
                 vendedor = v['usuarios'].get('nombre') or v['usuarios'].get('username') or 'Sistema'
             cliente = v['clientes']['nombre'] if v.get('clientes') else 'Consumidor Final'
             
-            # Formatear fecha limpia
-            fecha_str = v['fecha']
-            if 'T' in fecha_str:
-                partes = fecha_str.split('T')
-                f_date = partes[0]
-                f_time = partes[1].split('.')[0]
-                fecha_str = f"{f_date} {f_time}"
+            # Formatear fecha limpia a hora local de Argentina
+            fecha_str = formatear_fecha_ar(v['fecha'])
 
             item = {
                 'id': f"{v['id']:08d}",
@@ -427,3 +452,4 @@ class ReportesManager:
                     writer.writerow(["TOTAL SECCIÓN", "", "", "", f"{subtot:.2f}"])
                     writer.writerow([])
             return True
+
