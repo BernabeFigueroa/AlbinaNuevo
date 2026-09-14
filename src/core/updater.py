@@ -6,10 +6,10 @@ import subprocess
 from packaging import version
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout, QMessageBox, QApplication
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout, QMessageBox, QApplication, QScrollArea, QWidget
 
 # Debe coincidir con el tag del binario que se distribuye.
-CURRENT_VERSION = "1.1.13"
+CURRENT_VERSION = "1.1.14"
 GITHUB_REPO = "BernabeFigueroa/AlbinaNuevo"  # Repositorio oficial para releases/binarios
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 APP_DATA_DIR = os.path.join(
@@ -220,17 +220,46 @@ class UpdateDialog(QDialog):
             lbl_novedades_header.setStyleSheet("color: #2C2520; margin-top: 4px;")
             layout.addWidget(lbl_novedades_header)
 
+            # Las notas de una release pueden ser extensas. Sin un área
+            # desplazable, el diálogo crece fuera de la pantalla y oculta los
+            # botones que permiten instalar u omitir la actualización.
+            novedades_scroll = QScrollArea()
+            novedades_scroll.setWidgetResizable(True)
+            novedades_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            novedades_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            novedades_scroll.setFixedHeight(230)
+            novedades_scroll.setStyleSheet("""
+                QScrollArea {
+                    background-color: #FFFFFF;
+                    border: 1px solid #E5DFD5;
+                    border-radius: 8px;
+                }
+                QScrollBar:vertical {
+                    width: 10px;
+                    background: transparent;
+                }
+                QScrollBar::handle:vertical {
+                    background: #B09886;
+                    border-radius: 4px;
+                    min-height: 24px;
+                }
+            """)
+
+            novedades_container = QWidget()
+            novedades_layout = QVBoxLayout(novedades_container)
+            novedades_layout.setContentsMargins(10, 10, 10, 10)
+            novedades_layout.setSpacing(0)
+
             lbl_novedades = QLabel(body_text)
             lbl_novedades.setWordWrap(True)
             lbl_novedades.setStyleSheet("""
-                background-color: #FFFFFF;
-                border: 1px solid #E5DFD5;
-                border-radius: 8px;
-                padding: 10px;
                 color: #2C2520;
                 font-size: 12px;
             """)
-            layout.addWidget(lbl_novedades)
+            lbl_novedades.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            novedades_layout.addWidget(lbl_novedades)
+            novedades_scroll.setWidget(novedades_container)
+            layout.addWidget(novedades_scroll)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
