@@ -21,13 +21,15 @@ class AuthManager:
             response = supabase.auth.sign_in_with_password({"email": email, "password": password})
             cls._current_user = response.user
             
-            # 2. Obtener el rol del usuario desde la tabla 'usuarios'
+            # 2. Obtener el rol y nombre del usuario desde la tabla 'usuarios'
             if cls._current_user:
-                res_rol = supabase.table('usuarios').select('rol').eq('id', cls._current_user.id).execute()
-                if res_rol.data and len(res_rol.data) > 0:
-                    cls._user_role = res_rol.data[0]['rol']
+                res_user = supabase.table('usuarios').select('rol, nombre, username').eq('id', cls._current_user.id).execute()
+                if res_user.data and len(res_user.data) > 0:
+                    cls._user_role = res_user.data[0].get('rol')
+                    cls._current_user_name = res_user.data[0].get('nombre') or res_user.data[0].get('username') or 'Usuario'
                 else:
                     cls._user_role = 'empleada' # Fallback seguro
+                    cls._current_user_name = 'Usuario'
             return True, ""
         except Exception as e:
             msg = str(e)
@@ -57,6 +59,7 @@ class AuthManager:
         supabase.auth.sign_out()
         cls._current_user = None
         cls._user_role = None
+        cls._current_user_name = None
 
     @classmethod
     def is_admin(cls) -> bool:
@@ -65,3 +68,17 @@ class AuthManager:
     @classmethod
     def get_current_user(cls):
         return cls._current_user
+
+    @classmethod
+    def get_current_user_name(cls) -> str:
+        if getattr(cls, '_current_user_name', None):
+            return cls._current_user_name
+        if cls._current_user:
+            try:
+                res = get_supabase().table('usuarios').select('nombre, username').eq('id', cls._current_user.id).execute()
+                if res.data:
+                    cls._current_user_name = res.data[0].get('nombre') or res.data[0].get('username')
+                    return cls._current_user_name
+            except Exception:
+                pass
+        return "Admin" if cls.is_admin() else "Usuario"

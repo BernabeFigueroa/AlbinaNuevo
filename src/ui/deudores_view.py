@@ -106,10 +106,14 @@ class DeudoresView(QWidget):
             
         from src.core.ventas_manager import VentasManager
         try:
-            detalles = VentasManager.get_detalles_venta(venta_id)
+            res_detalles = VentasManager.get_detalles_venta(venta_id)
+            if isinstance(res_detalles, dict):
+                detalles = res_detalles.get('detalles', [])
+            else:
+                detalles = res_detalles
             texto = f"Detalle de la Venta #{venta_id}:\n\n"
             for d in detalles:
-                texto += f"- {d['cantidad']} x {d['nombre']} (${d['precio_unitario']:.2f}) = ${d['subtotal']:.2f}\n"
+                texto += f"- {d['cantidad']} x {d['nombre']} (${float(d['precio_unitario']):.2f}) = ${float(d['subtotal']):.2f}\n"
             
             QMessageBox.information(self, f"Detalle de Compra", texto)
         except Exception as e:

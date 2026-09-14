@@ -194,7 +194,7 @@ class ProductosManager:
         historial = []
         for d in res.data:
             v = d.get('ventas') or {}
-            if v.get('estado') == 'CANCELADA':
+            if v.get('estado') in ('CANCELADA', 'ANULADA'):
                 continue
             
             cliente_info = v.get('clientes') or {}

@@ -179,6 +179,8 @@ class MainWindow(QMainWindow):
             if self.deudores_view is None:
                 self.deudores_view = DeudoresView()
                 self.stacked_widget.addWidget(self.deudores_view)
+            else:
+                self.deudores_view.cargar_clientes()
             self.stacked_widget.setCurrentWidget(self.deudores_view)
 
         def show_caja():

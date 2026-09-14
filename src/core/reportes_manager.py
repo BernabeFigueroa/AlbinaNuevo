@@ -58,17 +58,38 @@ class ReportesManager:
         
         supabase = get_supabase()
         
-        query = supabase.table('ventas').select('id, fecha, total, metodo_pago, nro_comprobante_afip, tiene_provisorios, clientes(nombre), usuarios(nombre, username)').neq('estado', 'CANCELADA').gte('fecha', desde).lte('fecha', hasta)
+        try:
+            query = supabase.table('ventas').select(
+                'id, fecha, total, metodo_pago, nro_comprobante_afip, tiene_provisorios, estado, anulada_por, fecha_anulacion, motivo_anulacion, clientes(nombre), usuarios(nombre, username)'
+            ).neq('estado', 'CANCELADA').gte('fecha', desde).lte('fecha', hasta)
+            if metodo_pago:
+                query = query.eq('metodo_pago', metodo_pago)
+            if usuario_id:
+                query = query.eq('usuario_id', usuario_id)
+            res = query.order('fecha', desc=True).execute()
+            ventas = res.data or []
+        except Exception:
+            query = supabase.table('ventas').select(
+                'id, fecha, total, metodo_pago, nro_comprobante_afip, tiene_provisorios, estado, clientes(nombre), usuarios(nombre, username)'
+            ).neq('estado', 'CANCELADA').gte('fecha', desde).lte('fecha', hasta)
+            if metodo_pago:
+                query = query.eq('metodo_pago', metodo_pago)
+            if usuario_id:
+                query = query.eq('usuario_id', usuario_id)
+            res = query.order('fecha', desc=True).execute()
+            ventas = res.data or []
         
-        if metodo_pago:
-            query = query.eq('metodo_pago', metodo_pago)
-            
-        if usuario_id:
-            query = query.eq('usuario_id', usuario_id)
-            
-        res = query.order('fecha', desc=True).execute()
-        ventas = res.data
-        
+        # Resolver nombres de usuarios que anularon para trazabilidad
+        anulada_ids = list({v.get('anulada_por') for v in ventas if v.get('anulada_por')})
+        usuarios_map = {}
+        if anulada_ids:
+            try:
+                u_res = supabase.table('usuarios').select('id, nombre, username').in_('id', anulada_ids).execute()
+                for u in (u_res.data or []):
+                    usuarios_map[u['id']] = u.get('nombre') or u.get('username') or 'Usuario'
+            except Exception:
+                pass
+
         efectivo = 0.0
         transferencia = 0.0
         
@@ -76,16 +97,16 @@ class ReportesManager:
         for v in ventas:
             total = float(v['total'])
             mp = v['metodo_pago']
+            estado = v.get('estado') or 'COMPLETADA'
+            es_anulada = (estado in ('ANULADA', 'CANCELADA'))
             
-            if mp == 'EFECTIVO':
-                efectivo += total
-            elif mp in ('TRANSFERENCIA', 'TARJETA', 'TARJETA/TRANSFERENCIA'):
-                transferencia += total
-            elif mp == 'MIXTO':
-                # En Supabase Python habría que traer los movimientos asociados para precisión,
-                # por simplicidad asumiremos todo efectivo aquí o consultar caja_movimientos.
-                # Para evitar N+1 queries, simplificaremos
-                pass
+            if not es_anulada:
+                if mp == 'EFECTIVO':
+                    efectivo += total
+                elif mp in ('TRANSFERENCIA', 'TARJETA', 'TARJETA/TRANSFERENCIA'):
+                    transferencia += total
+                elif mp == 'MIXTO':
+                    pass
             
             vendedor = 'Sistema'
             if v.get('usuarios'):
@@ -94,6 +115,27 @@ class ReportesManager:
             nota_mod = v.get('nro_comprobante_afip')
             tiene_mod_precio = bool(nota_mod and "PRECIO MODIFICADO" in str(nota_mod))
 
+            u_anul_nombre = usuarios_map.get(v.get('anulada_por'))
+            motivo_anul = v.get('motivo_anulacion')
+            fecha_anul = v.get('fecha_anulacion')
+
+            if nota_mod and str(nota_mod).startswith("ANULADA|"):
+                partes = str(nota_mod).split("|")
+                if len(partes) >= 4:
+                    if not fecha_anul:
+                        fecha_anul = partes[1]
+                    if not u_anul_nombre:
+                        u_anul_nombre = partes[2]
+                    if not motivo_anul:
+                        motivo_anul = partes[3]
+            elif nota_mod and "ANULADA:" in str(nota_mod):
+                if not motivo_anul:
+                    motivo_anul = str(nota_mod).split("ANULADA:", 1)[1].split("|")[0].strip()
+                if not u_anul_nombre:
+                    u_anul_nombre = AuthManager.get_current_user_name()
+                if not fecha_anul:
+                    fecha_anul = v.get('fecha')
+
             ventas_fmt.append({
                 'id': v['id'],
                 'fecha': v['fecha'],
@@ -101,6 +143,12 @@ class ReportesManager:
                 'metodo_pago': mp,
                 'cliente': v['clientes']['nombre'] if v.get('clientes') else 'Consumidor Final',
                 'vendedor': vendedor,
+                'estado': estado,
+                'es_anulada': es_anulada,
+                'anulada_por': v.get('anulada_por'),
+                'usuario_anulacion_nombre': u_anul_nombre,
+                'fecha_anulacion': fecha_anul,
+                'motivo_anulacion': motivo_anul,
                 'precio_modificado': tiene_mod_precio,
                 'tiene_provisorios': bool(v.get('tiene_provisorios')),
                 'detalle_modificacion': nota_mod if tiene_mod_precio else None
@@ -110,7 +158,7 @@ class ReportesManager:
             'ventas': ventas_fmt,
             'total_efectivo': efectivo,
             'total_transferencia': transferencia,
-            'total_general': sum(v['total'] for v in ventas_fmt)
+            'total_general': sum(v['total'] for v in ventas_fmt if not v.get('es_anulada'))
         }
 
     @staticmethod
@@ -121,7 +169,7 @@ class ReportesManager:
         supabase = get_supabase()
         res = supabase.table('ventas_detalle').select(
             'cantidad, subtotal, productos(codigo_barras, nombre), ventas!inner(estado, fecha)'
-        ).neq('ventas.estado', 'CANCELADA').gte('ventas.fecha', desde).lte('ventas.fecha', hasta).execute()
+        ).neq('ventas.estado', 'CANCELADA').neq('ventas.estado', 'ANULADA').gte('ventas.fecha', desde).lte('ventas.fecha', hasta).execute()
         
         agrupado = defaultdict(lambda: {'codigo_barras': '', 'nombre': '', 'cant_total': 0, 'recaudacion': 0.0})
         
@@ -190,7 +238,7 @@ class ReportesManager:
         supabase = get_supabase()
         query = supabase.table('ventas_detalle').select(
             'cantidad, costo_unitario, subtotal, ventas!inner(estado, fecha, usuario_id)'
-        ).neq('ventas.estado', 'CANCELADA').gte('ventas.fecha', desde).lte('ventas.fecha', hasta)
+        ).neq('ventas.estado', 'CANCELADA').neq('ventas.estado', 'ANULADA').gte('ventas.fecha', desde).lte('ventas.fecha', hasta)
         
         if usuario_id:
             query = query.eq('ventas.usuario_id', usuario_id)
@@ -240,7 +288,7 @@ class ReportesManager:
         supabase = get_supabase()
         res = supabase.table('ventas_detalle').select(
             'cantidad, costo_unitario, subtotal, productos(categorias(nombre)), ventas!inner(estado, fecha)'
-        ).neq('ventas.estado', 'CANCELADA').gte('ventas.fecha', desde).lte('ventas.fecha', hasta).execute()
+        ).neq('ventas.estado', 'CANCELADA').neq('ventas.estado', 'ANULADA').gte('ventas.fecha', desde).lte('ventas.fecha', hasta).execute()
         
         agrupado = defaultdict(lambda: {'total_vendido': 0.0, 'costo_total': 0.0, 'ganancia_neta': 0.0})
         
@@ -277,7 +325,7 @@ class ReportesManager:
         supabase = get_supabase()
         res = supabase.table('ventas').select(
             'id, fecha, total, metodo_pago, clientes(nombre), usuarios(nombre, username)'
-        ).neq('estado', 'CANCELADA').gte('fecha', desde).lte('fecha', hasta).order('fecha', desc=False).execute()
+        ).neq('estado', 'CANCELADA').neq('estado', 'ANULADA').gte('fecha', desde).lte('fecha', hasta).order('fecha', desc=False).execute()
         
         ventas = res.data
         

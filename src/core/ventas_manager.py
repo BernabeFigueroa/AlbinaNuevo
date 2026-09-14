@@ -103,12 +103,42 @@ class VentasManager:
                 'subtotal': d['subtotal']
             })
 
-        # Obtener información adicional de la venta (ej. observaciones o ajuste de precios)
+        # Obtener información adicional de la venta (ej. observaciones, auditoría o anulación)
         info_venta = {}
         try:
-            res_v = supabase.table('ventas').select('nro_comprobante_afip, tiene_provisorios, metodo_pago, fecha').eq('id', venta_id).execute()
+            res_v = supabase.table('ventas').select('*').eq('id', venta_id).execute()
             if res_v.data:
                 info_venta = res_v.data[0]
+                
+                # Si está anulada, resolver datos de auditoría
+                if info_venta.get('estado') in ('ANULADA', 'CANCELADA'):
+                    nota = str(info_venta.get('nro_comprobante_afip') or '')
+                    if nota.startswith("ANULADA|"):
+                        partes = nota.split("|")
+                        if len(partes) >= 4:
+                            info_venta['fecha_anulacion'] = partes[1]
+                            info_venta['usuario_anulacion_nombre'] = partes[2]
+                            info_venta['motivo_anulacion'] = partes[3]
+                    elif "ANULADA:" in nota:
+                        info_venta['motivo_anulacion'] = nota.split("ANULADA:", 1)[1].strip()
+                        if not info_venta.get('usuario_anulacion_nombre'):
+                            info_venta['usuario_anulacion_nombre'] = AuthManager.get_current_user_name()
+                        if not info_venta.get('fecha_anulacion'):
+                            info_venta['fecha_anulacion'] = info_venta.get('fecha')
+
+                    anulada_por = info_venta.get('anulada_por')
+                    if anulada_por and not info_venta.get('usuario_anulacion_nombre'):
+                        try:
+                            u_res = supabase.table('usuarios').select('nombre, username').eq('id', anulada_por).execute()
+                            if u_res.data:
+                                info_venta['usuario_anulacion_nombre'] = u_res.data[0].get('nombre') or u_res.data[0].get('username')
+                        except Exception:
+                            pass
+                    
+                    if not info_venta.get('usuario_anulacion_nombre'):
+                        info_venta['usuario_anulacion_nombre'] = AuthManager.get_current_user_name()
+                    if not info_venta.get('fecha_anulacion'):
+                        info_venta['fecha_anulacion'] = info_venta.get('fecha')
         except Exception:
             pass
 
@@ -116,3 +146,90 @@ class VentasManager:
             'detalles': resultado,
             'info_venta': info_venta
         }
+
+    @staticmethod
+    def anular_venta(venta_id: int, motivo: str):
+        if not motivo or not str(motivo).strip():
+            raise ValueError("Debe ingresar un motivo para anular la venta.")
+        motivo = str(motivo).strip()
+
+        from datetime import datetime, timezone
+        supabase = get_supabase()
+        rpc_exitoso = False
+        try:
+            res_rpc = supabase.rpc('anular_venta_atomica', {
+                'p_venta_id': venta_id,
+                'p_motivo': motivo
+            }).execute()
+            if res_rpc.data:
+                rpc_exitoso = True
+        except Exception:
+            rpc_exitoso = False
+
+        if not rpc_exitoso:
+            # 1. Obtener la venta
+            res_v = supabase.table('ventas').select('*').eq('id', venta_id).execute()
+            if not res_v.data:
+                raise ValueError(f"La venta #{venta_id} no existe.")
+            venta = res_v.data[0]
+            if venta.get('estado') in ('ANULADA', 'CANCELADA'):
+                raise ValueError(f"La venta #{venta_id} ya se encuentra anulada.")
+
+            usuario = AuthManager.get_current_user()
+            usuario_id = str(usuario.id) if usuario else None
+            usuario_nombre = AuthManager.get_current_user_name()
+            now_iso = datetime.now(timezone.utc).isoformat()
+
+            # 2. Actualizar estado de la venta
+            datos_update = {
+                'estado': 'ANULADA',
+                'anulada_por': usuario_id,
+                'fecha_anulacion': now_iso,
+                'motivo_anulacion': motivo
+            }
+            try:
+                supabase.table('ventas').update(datos_update).eq('id', venta_id).execute()
+            except Exception:
+                nota_anul = f"ANULADA|{now_iso}|{usuario_nombre}|{motivo}"
+                supabase.table('ventas').update({
+                    'estado': 'ANULADA',
+                    'nro_comprobante_afip': nota_anul
+                }).eq('id', venta_id).execute()
+
+            # 3. Reintegrar stock de los productos vendidos
+            detalles_res = supabase.table('ventas_detalle').select('producto_id, cantidad, es_provisorio').eq('venta_id', venta_id).execute()
+            for d in (detalles_res.data or []):
+                prod_id = d.get('producto_id')
+                cant = float(d.get('cantidad') or 0)
+                if prod_id and not d.get('es_provisorio') and cant > 0:
+                    p_res = supabase.table('productos').select('stock_actual').eq('id', prod_id).execute()
+                    if p_res.data:
+                        stock_actual = float(p_res.data[0].get('stock_actual') or 0)
+                        supabase.table('productos').update({'stock_actual': stock_actual + cant}).eq('id', prod_id).execute()
+
+            # 4. Si fue fiada, eliminar la deuda generada en cuenta corriente
+            mp = str(venta.get('metodo_pago') or '').upper()
+            if any(term in mp for term in ['FIADO', 'CTA. CTE', 'CTA CTE', 'CUENTA CORRIENTE']):
+                try:
+                    supabase.table('cta_cte_movimientos').delete().eq('venta_id', venta_id).execute()
+                except Exception:
+                    pass
+
+            # 5. En caja_movimientos, marcar los movimientos vinculados como ANULADA
+            try:
+                movs = supabase.table('caja_movimientos').select('id, descripcion').eq('caja_sesion_id', venta.get('caja_sesion_id')).execute()
+                for m in (movs.data or []):
+                    desc = str(m.get('descripcion') or '')
+                    if f"Venta #{venta_id}" in desc:
+                        supabase.table('caja_movimientos').update({
+                            'tipo': 'ANULADA',
+                            'descripcion': f"{desc} [ANULADA: {motivo}]"
+                        }).eq('id', m['id']).execute()
+            except Exception:
+                pass
+
+        # 6. Invalidar caché local de productos para que la grilla refleje el stock actualizado
+        DataCache.invalidate_productos()
+
+        return True
+

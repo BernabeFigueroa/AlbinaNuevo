@@ -1,5 +1,18 @@
 # Registro de cambios
 
+## 2026-09-14 (v1.1.13)
+
+- **Anulación integral de ventas**:
+  - Posibilidad de anular ventas directamente desde la vista de detalle en la sección de Reportes con requerimiento de motivo y autorización.
+  - Reintegro automático al stock de los artículos correspondientes a la venta anulada (excluyendo artículos provisorios).
+  - Cancelación automática de la deuda generada en cuenta corriente si la venta fue realizada a crédito / fiado.
+  - Trazabilidad y ajuste en movimientos de caja, preservando el registro de auditoría con fecha, usuario y motivo.
+  - Nuevo filtro por estado en el listado de ventas (Todas, Realizadas, Anuladas) y diferenciación visual inmediata.
+- **ReportesManager y métricas de negocio**:
+  - Implementación centralizada de `ReportesManager` para la generación eficiente de métricas de ventas, rentabilidad e inventario.
+  - Exclusión consistente de ventas anuladas en los cálculos de facturación, costos y ganancias brutas.
+  - Incorporación del script de migración SQL para anulación transaccional atómica (`migrations/20260914_anulacion_ventas.sql`).
+
 ## 2026-09-12
 
 - Rendimiento, fase 1: las vistas de Productos, Clientes, Proveedores y Categorías ahora solicitan sus listas remotas en segundo plano; la interfaz se abre sin esperar a Supabase.

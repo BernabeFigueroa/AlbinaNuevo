@@ -210,7 +210,7 @@ class CajaManager:
             
         # 2. Obtener ventas de la sesión
         try:
-            ventas_res = supabase.table('ventas').select('id, metodo_pago, total').eq('caja_sesion_id', caja_sesion_id).neq('estado', 'CANCELADA').execute()
+            ventas_res = supabase.table('ventas').select('id, metodo_pago, total').eq('caja_sesion_id', caja_sesion_id).neq('estado', 'CANCELADA').neq('estado', 'ANULADA').execute()
             for v in ventas_res.data:
                 total_v = float(v['total'] or 0)
                 mp = v['metodo_pago'].upper()

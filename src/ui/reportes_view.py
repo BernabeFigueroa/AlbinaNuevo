@@ -19,10 +19,11 @@ def formatear_fecha_ar(fecha_str):
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, 
-    QTableWidgetItem, QPushButton, QHeaderView, QDateEdit, QTabWidget, QFrame
+    QTableWidgetItem, QPushButton, QHeaderView, QDateEdit, QTabWidget, QFrame,
+    QLineEdit, QMenu
 )
-from PyQt6.QtCore import Qt, QDate
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, QDate, pyqtSignal
+from PyQt6.QtGui import QFont, QColor, QAction
 
 from src.core.reportes_manager import ReportesManager
 from src.core.caja_manager import CajaManager
@@ -94,6 +95,283 @@ class DialogoDetalleModerno(QDialog):
         btn_ok.clicked.connect(self.accept)
         btn_layout.addWidget(btn_ok)
         layout.addLayout(btn_layout)
+
+
+class DialogoConfirmarAnulacion(QDialog):
+    def __init__(self, venta_id: int, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(f"Anular Venta #{venta_id:08d}")
+        self.setMinimumWidth(440)
+        self.motivo = ""
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #FAF8F5;
+                border: 1px solid #E5DFD5;
+                border-radius: 12px;
+            }
+            QLabel {
+                color: #2C2520;
+            }
+            QLineEdit {
+                background-color: #FFFFFF;
+                color: #2C2520;
+                border: 1.5px solid #D5CFC7;
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-size: 13px;
+            }
+            QLineEdit:focus {
+                border-color: #B09886;
+            }
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(14)
+        
+        lbl_tit = QLabel("Confirmar Anulación de Venta")
+        lbl_tit.setFont(QFont("Segoe UI", 15, QFont.Weight.Bold))
+        lbl_tit.setStyleSheet("color: #721C24;")
+        layout.addWidget(lbl_tit)
+        
+        lbl_desc = QLabel(
+            f"¿Está seguro de que desea anular la <b>Venta #{venta_id:08d}</b>?<br><br>"
+            "• Los productos regresarán automáticamente al inventario.<br>"
+            "• El importe se descontará de los totales de caja.<br>"
+            "• Si fue fiada, se cancelará la deuda del cliente.<br>"
+            "• La venta quedará registrada como <b>ANULADA</b> para auditoría."
+        )
+        lbl_desc.setTextFormat(Qt.TextFormat.RichText)
+        lbl_desc.setWordWrap(True)
+        lbl_desc.setStyleSheet("font-size: 12.5px; color: #495057; line-height: 1.4;")
+        layout.addWidget(lbl_desc)
+        
+        lbl_motivo = QLabel("Motivo o descripción de la anulación (obligatorio):")
+        lbl_motivo.setFont(QFont("Segoe UI", 11, QFont.Weight.DemiBold))
+        layout.addWidget(lbl_motivo)
+        
+        self.txt_motivo = QLineEdit()
+        self.txt_motivo.setPlaceholderText("Ej: Cliente cambió de accesorios, error en cobro...")
+        layout.addWidget(self.txt_motivo)
+        
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        
+        btn_cancel = QPushButton("Cancelar")
+        btn_cancel.setStyleSheet("""
+            QPushButton {
+                background-color: #E5DFD5;
+                color: #2C2520;
+                border: none;
+                border-radius: 8px;
+                padding: 8px 18px;
+                font-weight: 600;
+                font-size: 13px;
+            }
+            QPushButton:hover { background-color: #D5CFC7; }
+        """)
+        btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_cancel.clicked.connect(self.reject)
+        btn_layout.addWidget(btn_cancel)
+        
+        btn_anular = QPushButton("Confirmar Anulación")
+        btn_anular.setStyleSheet("""
+            QPushButton {
+                background-color: #C0392B;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 8px;
+                padding: 8px 18px;
+                font-weight: 600;
+                font-size: 13px;
+            }
+            QPushButton:hover { background-color: #A93226; }
+        """)
+        btn_anular.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_anular.clicked.connect(self.validar_y_aceptar)
+        btn_layout.addWidget(btn_anular)
+        
+        layout.addLayout(btn_layout)
+        
+    def validar_y_aceptar(self):
+        motivo = self.txt_motivo.text().strip()
+        if not motivo:
+            QMessageBox.warning(self, "Atención", "Debe ingresar una descripción o motivo para la anulación.")
+            self.txt_motivo.setFocus()
+            return
+        self.motivo = motivo
+        self.accept()
+
+
+class DialogoDetalleVenta(QDialog):
+    anulacion_exitosa = pyqtSignal()
+
+    def __init__(self, venta_id: int, info_venta: dict, contenido_html: str, parent=None):
+        super().__init__(parent)
+        self.venta_id = venta_id
+        self.info_venta = info_venta or {}
+        self.setWindowTitle(f"Detalle de Venta #{venta_id:08d}")
+        self.setMinimumWidth(520)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #FAF8F5;
+                border: 1px solid #E5DFD5;
+                border-radius: 12px;
+            }
+            QLabel {
+                color: #2C2520;
+                font-size: 13px;
+            }
+            QPushButton {
+                background-color: #B09886;
+                color: #FFFFFF;
+                border: none;
+                border-radius: 8px;
+                padding: 8px 24px;
+                font-weight: 600;
+                font-size: 13px;
+                min-height: 32px;
+            }
+            QPushButton:hover {
+                background-color: #9C8573;
+            }
+            QPushButton:pressed {
+                background-color: #8C7869;
+            }
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        
+        # Barra de encabezado: Título + Botón de 3 puntitos
+        header_layout = QHBoxLayout()
+        lbl_titulo = QLabel(f"Detalle de Venta #{venta_id:08d}")
+        lbl_titulo.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        lbl_titulo.setStyleSheet("color: #2C2520; letter-spacing: 0.3px;")
+        header_layout.addWidget(lbl_titulo)
+        header_layout.addStretch()
+        
+        # Botón de 3 puntitos discreto y elegante
+        import os, sys
+        from PyQt6.QtGui import QIcon
+        from PyQt6.QtCore import QSize
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        icon_path = os.path.join(base_path, "assets", "icons", "more_vert.svg")
+
+        self.btn_opciones = QPushButton()
+        if os.path.exists(icon_path):
+            self.btn_opciones.setIcon(QIcon(icon_path))
+            self.btn_opciones.setIconSize(QSize(20, 20))
+        else:
+            self.btn_opciones.setText("⋮")
+            self.btn_opciones.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+        self.btn_opciones.setFixedSize(36, 36)
+        self.btn_opciones.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_opciones.setToolTip("Opciones de venta")
+        self.btn_opciones.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: 1px solid transparent;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #EFE9E0;
+                border: 1px solid #D5CFC7;
+            }
+            QPushButton:pressed {
+                background-color: #E2DBD0;
+            }
+        """)
+        self.btn_opciones.clicked.connect(self.mostrar_menu_opciones)
+        header_layout.addWidget(self.btn_opciones)
+        
+        layout.addLayout(header_layout)
+        
+        frame = QFrame()
+        frame.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-radius: 10px;
+                border: 1px solid #E5DFD5;
+            }
+        """)
+        frame_layout = QVBoxLayout(frame)
+        frame_layout.setContentsMargins(20, 20, 20, 20)
+        
+        lbl_contenido = QLabel(contenido_html)
+        lbl_contenido.setWordWrap(True)
+        lbl_contenido.setTextFormat(Qt.TextFormat.RichText)
+        frame_layout.addWidget(lbl_contenido)
+        layout.addWidget(frame)
+        
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_ok = QPushButton("Aceptar")
+        btn_ok.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_ok.clicked.connect(self.accept)
+        btn_layout.addWidget(btn_ok)
+        layout.addLayout(btn_layout)
+
+    def mostrar_menu_opciones(self):
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #FFFFFF;
+                border: 1px solid #E5DFD5;
+                border-radius: 8px;
+                padding: 6px;
+            }
+            QMenu::item {
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-size: 13px;
+                color: #2C2520;
+            }
+            QMenu::item:selected {
+                background-color: #FDF2F2;
+                color: #C0392B;
+            }
+            QMenu::item:disabled {
+                color: #A09891;
+            }
+        """)
+        
+        es_anulada = self.info_venta.get('estado') in ('ANULADA', 'CANCELADA')
+        
+        if es_anulada:
+            action_anular = QAction("Venta ya Anulada", self)
+            action_anular.setEnabled(False)
+            menu.addAction(action_anular)
+        else:
+            action_anular = QAction("Anular Venta", self)
+            action_anular.triggered.connect(self.solicitar_anulacion)
+            menu.addAction(action_anular)
+            
+        menu.exec(self.btn_opciones.mapToGlobal(self.btn_opciones.rect().bottomLeft()))
+
+    def solicitar_anulacion(self):
+        dlg = DialogoConfirmarAnulacion(self.venta_id, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            motivo = dlg.motivo
+            try:
+                from src.core.ventas_manager import VentasManager
+                VentasManager.anular_venta(self.venta_id, motivo)
+                QMessageBox.information(
+                    self, "Venta Anulada",
+                    f"La venta #{self.venta_id:08d} fue anulada correctamente.\n\n"
+                    "• Los productos volvieron al inventario.\n"
+                    "• El importe fue descontado de la caja."
+                )
+                self.anulacion_exitosa.emit()
+                self.accept()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"No se pudo anular la venta:\n{str(e)}")
+
+
 class ReportesView(QWidget):
     def __init__(self):
         super().__init__()
@@ -135,6 +413,12 @@ class ReportesView(QWidget):
         self.cb_metodo_pago = QComboBox()
         self.cb_metodo_pago.addItems(["TODOS", "EFECTIVO", "TRANSFERENCIA", "MIXTO", "CUENTA CORRIENTE"])
         filtro_layout.addWidget(self.cb_metodo_pago)
+
+        self.lbl_estado = QLabel("Estado:")
+        filtro_layout.addWidget(self.lbl_estado)
+        self.cb_estado = QComboBox()
+        self.cb_estado.addItems(["TODAS", "REALIZADAS", "ANULADAS"])
+        filtro_layout.addWidget(self.cb_estado)
         
         self.lbl_vendedor = QLabel("Vendedor:")
         filtro_layout.addWidget(self.lbl_vendedor)
@@ -459,16 +743,22 @@ class ReportesView(QWidget):
         if index == 0:
             self.lbl_pago.show()
             self.cb_metodo_pago.show()
+            self.lbl_estado.show()
+            self.cb_estado.show()
             self.lbl_vendedor.show()
             self.cb_vendedor.show()
         elif index in (3, 5):
             self.lbl_pago.hide()
             self.cb_metodo_pago.hide()
+            self.lbl_estado.hide()
+            self.cb_estado.hide()
             self.lbl_vendedor.show()
             self.cb_vendedor.show()
         else:
             self.lbl_pago.hide()
             self.cb_metodo_pago.hide()
+            self.lbl_estado.hide()
+            self.cb_estado.hide()
             self.lbl_vendedor.hide()
             self.cb_vendedor.hide()
         if self._filtros_reportes:
@@ -568,8 +858,9 @@ class ReportesView(QWidget):
 
 
     def cargar_ventas(self, desde, hasta, usuario_id=None, data=None):
-        metodo = self.cb_metodo_pago.currentText()
+        metodo = self.cb_metodo_pago.currentText() if hasattr(self, 'cb_metodo_pago') else "TODOS"
         metodo_filtro = None if metodo == "TODOS" else metodo
+        estado_filtro = self.cb_estado.currentText() if hasattr(self, 'cb_estado') else "TODAS"
         if data is None:
             data = ReportesManager.get_ventas_por_fecha(desde, hasta, metodo_filtro, usuario_id)
         
@@ -579,46 +870,74 @@ class ReportesView(QWidget):
         
         self.tabla_ventas.setRowCount(0)
         for v in data['ventas']:
+            es_anulada = bool(v.get('es_anulada'))
+            if estado_filtro == "REALIZADAS" and es_anulada:
+                continue
+            if estado_filtro == "ANULADAS" and not es_anulada:
+                continue
+
             row = self.tabla_ventas.rowCount()
             self.tabla_ventas.insertRow(row)
+
+            color_texto = QColor("#8C827A") if es_anulada else QColor("#2C2520")
             
             item_id = QTableWidgetItem(f"{v['id']:08d}")
             item_id.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            item_id.setForeground(color_texto)
             self.tabla_ventas.setItem(row, 0, item_id)
             
             item_fecha = QTableWidgetItem(formatear_fecha_ar(v['fecha']))
             item_fecha.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            item_fecha.setForeground(color_texto)
             self.tabla_ventas.setItem(row, 1, item_fecha)
             
-            self.tabla_ventas.setItem(row, 2, QTableWidgetItem(v['cliente'] or "Consumidor Final"))
-            self.tabla_ventas.setItem(row, 3, QTableWidgetItem(v['vendedor']))
+            item_cli = QTableWidgetItem(v['cliente'] or "Consumidor Final")
+            item_cli.setForeground(color_texto)
+            self.tabla_ventas.setItem(row, 2, item_cli)
+
+            item_vend = QTableWidgetItem(v['vendedor'])
+            item_vend.setForeground(color_texto)
+            self.tabla_ventas.setItem(row, 3, item_vend)
             
             item_mp = QTableWidgetItem(v['metodo_pago'])
             item_mp.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            item_mp.setForeground(color_texto)
             self.tabla_ventas.setItem(row, 4, item_mp)
             
             item_total = QTableWidgetItem(f"${v['total']:,.2f}")
             item_total.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            item_total.setForeground(color_texto)
             self.tabla_ventas.setItem(row, 5, item_total)
 
-            # Compartir la columna de avisos, conservando ambas señales de auditoría.
-            avisos, detalles_aviso = [], []
-            if v.get('precio_modificado'):
-                avisos.append("Precio modificado")
-                detalles_aviso.append(v.get('detalle_modificacion') or "Precio editado manualmente en la venta")
-            if v.get('tiene_provisorios'):
-                avisos.append("Provisorio")
-                detalles_aviso.append("Incluye artículos provisorios que no pertenecen al stock. Abra el detalle para identificarlos.")
-            if avisos:
-                item_alerta = QTableWidgetItem("⚠ " + " / ".join(avisos))
+            if es_anulada:
+                u_anul = v.get('usuario_anulacion_nombre') or 'Usuario'
+                f_anul = formatear_fecha_ar(v.get('fecha_anulacion'))
+                m_anul = v.get('motivo_anulacion') or 'Sin motivo'
+                item_alerta = QTableWidgetItem("ANULADA")
                 item_alerta.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                item_alerta.setForeground(Qt.GlobalColor.red)
-                item_alerta.setToolTip("\n".join(detalles_aviso))
+                item_alerta.setForeground(QColor("#C0392B"))
+                item_alerta.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+                item_alerta.setToolTip(f"Venta ANULADA por {u_anul} ({f_anul})\nMotivo: {m_anul}")
+                self.tabla_ventas.setItem(row, 6, item_alerta)
             else:
-                item_alerta = QTableWidgetItem("Normal")
-                item_alerta.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                item_alerta.setForeground(Qt.GlobalColor.darkGray)
-            self.tabla_ventas.setItem(row, 6, item_alerta)
+                # Compartir la columna de avisos, conservando ambas señales de auditoría.
+                avisos, detalles_aviso = [], []
+                if v.get('precio_modificado'):
+                    avisos.append("Precio modificado")
+                    detalles_aviso.append(v.get('detalle_modificacion') or "Precio editado manualmente en la venta")
+                if v.get('tiene_provisorios'):
+                    avisos.append("Provisorio")
+                    detalles_aviso.append("Incluye artículos provisorios que no pertenecen al stock. Abra el detalle para identificarlos.")
+                if avisos:
+                    item_alerta = QTableWidgetItem("⚠ " + " / ".join(avisos))
+                    item_alerta.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    item_alerta.setForeground(Qt.GlobalColor.red)
+                    item_alerta.setToolTip("\n".join(detalles_aviso))
+                else:
+                    item_alerta = QTableWidgetItem("Normal")
+                    item_alerta.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    item_alerta.setForeground(Qt.GlobalColor.darkGray)
+                self.tabla_ventas.setItem(row, 6, item_alerta)
 
     def cargar_productos(self, desde, hasta, data=None):
         if data is None:
@@ -815,6 +1134,23 @@ class ReportesView(QWidget):
         if info_venta.get('tiene_provisorios') or any(d.get('es_provisorio') for d in detalles):
             html_aviso += '<p style="color: #856404;"><b>⚠ Artículos provisorios:</b> esta venta incluye artículos sin movimiento de stock.</p>'
 
+        es_anulada = info_venta.get('estado') in ('ANULADA', 'CANCELADA')
+        html_anulada = ""
+        if es_anulada:
+            u_anul = escape(str(info_venta.get('usuario_anulacion_nombre') or 'Usuario'))
+            f_anul = escape(str(formatear_fecha_ar(info_venta.get('fecha_anulacion'))))
+            m_anul = escape(str(info_venta.get('motivo_anulacion') or 'Sin motivo especificado'))
+            html_anulada = f"""
+            <div style="background-color: #F8D7DA; border: 1.5px solid #F5C6CB; border-radius: 8px; padding: 12px; margin-top: 15px; color: #721C24;">
+                <b style="font-size: 13px;">VENTA ANULADA</b><br>
+                <div style="margin-top: 6px; font-size: 12px; line-height: 1.5; color: #491217;">
+                    <b>Fecha de anulación:</b> {f_anul}<br>
+                    <b>Anulada por:</b> {u_anul}<br>
+                    <b>Motivo:</b> {m_anul}
+                </div>
+            </div>
+            """
+
         html = f"""
         {html_aviso}
         <div style="color: #666666; font-weight: bold; margin-bottom: 15px; font-size: 12px; letter-spacing: 1px;">ARTÍCULOS VENDIDOS</div>
@@ -841,6 +1177,8 @@ class ReportesView(QWidget):
                 <td align="right"><b style="color: #B09886; font-size: 20px;">${total:.2f}</b></td>
             </tr>
         </table>
+        {html_anulada}
         """
-        dialog = DialogoDetalleModerno(f"Detalle de Venta #{venta_id:08d}", html, self)
+        dialog = DialogoDetalleVenta(venta_id, info_venta, html, self)
+        dialog.anulacion_exitosa.connect(self.generar_reportes)
         dialog.exec()
