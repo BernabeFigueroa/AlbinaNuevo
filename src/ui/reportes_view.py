@@ -205,6 +205,7 @@ class DialogoConfirmarAnulacion(QDialog):
 
 class DialogoDetalleVenta(QDialog):
     anulacion_exitosa = pyqtSignal()
+    cambio_metodo_exitoso = pyqtSignal(str)
 
     def __init__(self, venta_id: int, info_venta: dict, contenido_html: str, parent=None):
         super().__init__(parent)
@@ -242,7 +243,7 @@ class DialogoDetalleVenta(QDialog):
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setSpacing(14)
         
         # Barra de encabezado: Título + Botón de 3 puntitos
         header_layout = QHBoxLayout()
@@ -290,6 +291,57 @@ class DialogoDetalleVenta(QDialog):
         header_layout.addWidget(self.btn_opciones)
         
         layout.addLayout(header_layout)
+
+        # Tarjeta de Medio de Pago con opción de cambio rápido
+        self.card_pago = QFrame()
+        self.card_pago.setStyleSheet("""
+            QFrame {
+                background-color: #FFFFFF;
+                border-radius: 10px;
+                border: 1px solid #E5DFD5;
+            }
+        """)
+        pago_layout = QHBoxLayout(self.card_pago)
+        pago_layout.setContentsMargins(16, 10, 16, 10)
+        pago_layout.setSpacing(10)
+
+        lbl_tit_pago = QLabel("Medio de Pago:")
+        lbl_tit_pago.setFont(QFont("Segoe UI", 11, QFont.Weight.DemiBold))
+        lbl_tit_pago.setStyleSheet("color: #5A5047;")
+        pago_layout.addWidget(lbl_tit_pago)
+
+        self.lbl_metodo_badge = QLabel()
+        pago_layout.addWidget(self.lbl_metodo_badge)
+
+        pago_layout.addStretch()
+
+        self.btn_cambiar_metodo = QPushButton()
+        self.btn_cambiar_metodo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_cambiar_metodo.setStyleSheet("""
+            QPushButton {
+                background-color: #F4EFE6;
+                color: #2C2520;
+                border: 1.5px solid #B09886;
+                border-radius: 8px;
+                padding: 6px 14px;
+                font-weight: 600;
+                font-size: 12px;
+                min-height: 28px;
+            }
+            QPushButton:hover {
+                background-color: #B09886;
+                color: #FFFFFF;
+            }
+            QPushButton:pressed {
+                background-color: #9C8573;
+                color: #FFFFFF;
+            }
+        """)
+        self.btn_cambiar_metodo.clicked.connect(self.solicitar_cambio_metodo)
+        pago_layout.addWidget(self.btn_cambiar_metodo)
+
+        self._actualizar_ui_metodo_pago()
+        layout.addWidget(self.card_pago)
         
         frame = QFrame()
         frame.setStyleSheet("""
@@ -316,6 +368,77 @@ class DialogoDetalleVenta(QDialog):
         btn_layout.addWidget(btn_ok)
         layout.addLayout(btn_layout)
 
+    def _actualizar_ui_metodo_pago(self):
+        mp = str(self.info_venta.get('metodo_pago') or '').strip().upper()
+        es_anulada = self.info_venta.get('estado') in ('ANULADA', 'CANCELADA')
+
+        if mp == 'EFECTIVO':
+            self.lbl_metodo_badge.setText("EFECTIVO")
+            self.lbl_metodo_badge.setStyleSheet("""
+                background-color: #E8F5E9; color: #2E7D32; border: 1px solid #C8E6C9;
+                border-radius: 6px; padding: 4px 10px; font-weight: bold; font-size: 12px;
+            """)
+            self.btn_cambiar_metodo.setText("⇄ Cambiar a Transferencia")
+            self.btn_cambiar_metodo.setToolTip("Cambiar el método de pago de esta venta a Transferencia")
+            self.btn_cambiar_metodo.setVisible(not es_anulada)
+        elif mp == 'TRANSFERENCIA':
+            self.lbl_metodo_badge.setText("TRANSFERENCIA")
+            self.lbl_metodo_badge.setStyleSheet("""
+                background-color: #E3F2FD; color: #1565C0; border: 1px solid #BBDEFB;
+                border-radius: 6px; padding: 4px 10px; font-weight: bold; font-size: 12px;
+            """)
+            self.btn_cambiar_metodo.setText("⇄ Cambiar a Efectivo")
+            self.btn_cambiar_metodo.setToolTip("Cambiar el método de pago de esta venta a Efectivo")
+            self.btn_cambiar_metodo.setVisible(not es_anulada)
+        else:
+            self.lbl_metodo_badge.setText(mp)
+            self.lbl_metodo_badge.setStyleSheet("""
+                background-color: #F5F5F5; color: #616161; border: 1px solid #E0E0E0;
+                border-radius: 6px; padding: 4px 10px; font-weight: bold; font-size: 12px;
+            """)
+            self.btn_cambiar_metodo.setVisible(False)
+
+    def solicitar_cambio_metodo(self):
+        es_anulada = self.info_venta.get('estado') in ('ANULADA', 'CANCELADA')
+        if es_anulada:
+            QMessageBox.warning(self, "Atención", "No se puede cambiar el método de pago de una venta anulada.")
+            return
+
+        metodo_actual = str(self.info_venta.get('metodo_pago') or '').strip().upper()
+        if metodo_actual not in ('EFECTIVO', 'TRANSFERENCIA'):
+            QMessageBox.warning(
+                self, "Atención",
+                f"Solo se puede cambiar el método de pago entre Efectivo y Transferencia.\n"
+                f"Esta venta posee el método '{metodo_actual}'."
+            )
+            return
+
+        nuevo_metodo = 'TRANSFERENCIA' if metodo_actual == 'EFECTIVO' else 'EFECTIVO'
+
+        resp = QMessageBox.question(
+            self, "Confirmar Cambio de Método de Pago",
+            f"¿Desea cambiar el método de pago de la venta #{self.venta_id:08d}?\n\n"
+            f"• Actual: {metodo_actual}\n"
+            f"• Nuevo: {nuevo_metodo}\n\n"
+            "Los reportes y registros de caja se actualizarán automáticamente.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if resp == QMessageBox.StandardButton.Yes:
+            try:
+                from src.core.ventas_manager import VentasManager
+                res = VentasManager.cambiar_metodo_pago(self.venta_id, nuevo_metodo)
+                self.info_venta['metodo_pago'] = nuevo_metodo
+                self._actualizar_ui_metodo_pago()
+                QMessageBox.information(
+                    self, "Método Actualizado",
+                    f"El método de pago fue cambiado exitosamente a {nuevo_metodo}."
+                )
+                self.cambio_metodo_exitoso.emit(nuevo_metodo)
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"No se pudo cambiar el método de pago:\n{str(e)}")
+
     def mostrar_menu_opciones(self):
         menu = QMenu(self)
         menu.setStyleSheet("""
@@ -332,8 +455,8 @@ class DialogoDetalleVenta(QDialog):
                 color: #2C2520;
             }
             QMenu::item:selected {
-                background-color: #FDF2F2;
-                color: #C0392B;
+                background-color: #F4EFE6;
+                color: #2C2520;
             }
             QMenu::item:disabled {
                 color: #A09891;
@@ -341,7 +464,15 @@ class DialogoDetalleVenta(QDialog):
         """)
         
         es_anulada = self.info_venta.get('estado') in ('ANULADA', 'CANCELADA')
-        
+        metodo_actual = str(self.info_venta.get('metodo_pago') or '').strip().upper()
+
+        if not es_anulada and metodo_actual in ('EFECTIVO', 'TRANSFERENCIA'):
+            nuevo_metodo = 'TRANSFERENCIA' if metodo_actual == 'EFECTIVO' else 'EFECTIVO'
+            action_cambiar = QAction(f"Cambiar método a {nuevo_metodo.capitalize()}", self)
+            action_cambiar.triggered.connect(self.solicitar_cambio_metodo)
+            menu.addAction(action_cambiar)
+            menu.addSeparator()
+
         if es_anulada:
             action_anular = QAction("Venta ya Anulada", self)
             action_anular.setEnabled(False)
@@ -524,7 +655,7 @@ class ReportesView(QWidget):
             }
         """)
 
-    def crear_tarjeta_resumen(self, titulo, valor_inicial, color_hex):
+    def crear_tarjeta_resumen(self, titulo, valor_inicial, color_hex, subtitulo=None):
         frame = QFrame()
         frame.setStyleSheet(f"""
             QFrame {{
@@ -535,6 +666,7 @@ class ReportesView(QWidget):
         """)
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(15, 10, 15, 10)
+        layout.setSpacing(2)
         
         lbl_titulo = QLabel(titulo)
         lbl_titulo.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
@@ -546,7 +678,15 @@ class ReportesView(QWidget):
         
         layout.addWidget(lbl_titulo)
         layout.addWidget(lbl_valor)
-        
+
+        lbl_sub = None
+        if subtitulo is not None:
+            lbl_sub = QLabel(subtitulo)
+            lbl_sub.setFont(QFont("Segoe UI", 9))
+            lbl_sub.setStyleSheet("color: #8C827A; border: none; background: transparent;")
+            layout.addWidget(lbl_sub)
+            return frame, lbl_valor, lbl_sub
+
         return frame, lbl_valor
 
     def setup_tab_ventas(self):
@@ -559,7 +699,9 @@ class ReportesView(QWidget):
         
         self.frame_efectivo, self.lbl_tot_efectivo = self.crear_tarjeta_resumen("EFECTIVO", "$0.00", "#B09886")
         self.frame_transferencia, self.lbl_tot_transferencia = self.crear_tarjeta_resumen("TRANSFERENCIA", "$0.00", "#000000")
-        self.frame_general, self.lbl_tot_general = self.crear_tarjeta_resumen("TOTAL GENERAL", "$0.00", "#D99890")
+        self.frame_general, self.lbl_tot_general, self.lbl_tot_general_bruto = self.crear_tarjeta_resumen(
+            "TOTAL GENERAL (-35%)", "$0.00", "#D99890", subtitulo="Bruto: $0.00"
+        )
         
         resumen_layout.addWidget(self.frame_efectivo)
         resumen_layout.addWidget(self.frame_transferencia)
@@ -574,6 +716,8 @@ class ReportesView(QWidget):
         self.tabla_ventas.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla_ventas.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla_ventas.cellDoubleClicked.connect(self.ver_detalle_venta)
+        self.tabla_ventas.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tabla_ventas.customContextMenuRequested.connect(self.mostrar_menu_contextual_ventas)
         self.aplicar_estilo_tabla(self.tabla_ventas)
         layout.addWidget(self.tabla_ventas)
 
@@ -864,9 +1008,19 @@ class ReportesView(QWidget):
         if data is None:
             data = ReportesManager.get_ventas_por_fecha(desde, hasta, metodo_filtro, usuario_id)
         
+        total_gen = float(data.get('total_general') or 0.0)
+        total_descontado = total_gen * 0.65  # Valor con el 35% restado
+
         self.lbl_tot_efectivo.setText(f"${data['total_efectivo']:.2f}")
         self.lbl_tot_transferencia.setText(f"${data['total_transferencia']:.2f}")
-        self.lbl_tot_general.setText(f"${data['total_general']:.2f}")
+        self.lbl_tot_general.setText(f"${total_descontado:.2f}")
+        self.lbl_tot_general.setToolTip(
+            f"Total bruto: ${total_gen:,.2f}\n"
+            f"Menos 35%: -${(total_gen * 0.35):,.2f}\n"
+            f"Total (-35%): ${total_descontado:,.2f}"
+        )
+        if hasattr(self, 'lbl_tot_general_bruto') and self.lbl_tot_general_bruto is not None:
+            self.lbl_tot_general_bruto.setText(f"Bruto: ${total_gen:,.2f}")
         
         self.tabla_ventas.setRowCount(0)
         for v in data['ventas']:
@@ -1181,4 +1335,81 @@ class ReportesView(QWidget):
         """
         dialog = DialogoDetalleVenta(venta_id, info_venta, html, self)
         dialog.anulacion_exitosa.connect(self.generar_reportes)
+        dialog.cambio_metodo_exitoso.connect(self.generar_reportes)
         dialog.exec()
+
+    def mostrar_menu_contextual_ventas(self, pos):
+        row = self.tabla_ventas.rowAt(pos.y())
+        if row < 0:
+            return
+
+        item_id = self.tabla_ventas.item(row, 0)
+        item_mp = self.tabla_ventas.item(row, 4)
+        if not item_id or not item_mp:
+            return
+
+        venta_id = int(item_id.text())
+        metodo_actual = item_mp.text().strip().upper()
+
+        item_alerta = self.tabla_ventas.item(row, 6)
+        es_anulada = item_alerta is not None and "ANULADA" in item_alerta.text().upper()
+
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #FFFFFF;
+                border: 1px solid #E5DFD5;
+                border-radius: 8px;
+                padding: 6px;
+            }
+            QMenu::item {
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-size: 13px;
+                color: #2C2520;
+            }
+            QMenu::item:selected {
+                background-color: #F4EFE6;
+                color: #2C2520;
+            }
+            QMenu::item:disabled {
+                color: #A09891;
+            }
+        """)
+
+        act_ver = QAction("👁 Ver Detalle de Venta", self)
+        act_ver.triggered.connect(lambda: self.ver_detalle_venta(row, 0))
+        menu.addAction(act_ver)
+
+        if not es_anulada and metodo_actual in ('EFECTIVO', 'TRANSFERENCIA'):
+            nuevo_metodo = 'TRANSFERENCIA' if metodo_actual == 'EFECTIVO' else 'EFECTIVO'
+            texto_accion = f"⇄ Cambiar a {nuevo_metodo.capitalize()}"
+            act_cambiar = QAction(texto_accion, self)
+            act_cambiar.triggered.connect(lambda: self._cambiar_metodo_desde_tabla(venta_id, metodo_actual, nuevo_metodo))
+            menu.addSeparator()
+            menu.addAction(act_cambiar)
+
+        menu.exec(self.tabla_ventas.viewport().mapToGlobal(pos))
+
+    def _cambiar_metodo_desde_tabla(self, venta_id: int, metodo_actual: str, nuevo_metodo: str):
+        resp = QMessageBox.question(
+            self, "Confirmar Cambio de Método de Pago",
+            f"¿Desea cambiar el método de pago de la venta #{venta_id:08d}?\n\n"
+            f"• Actual: {metodo_actual}\n"
+            f"• Nuevo: {nuevo_metodo}\n\n"
+            "Los reportes y registros de caja se actualizarán automáticamente.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if resp == QMessageBox.StandardButton.Yes:
+            try:
+                from src.core.ventas_manager import VentasManager
+                VentasManager.cambiar_metodo_pago(venta_id, nuevo_metodo)
+                QMessageBox.information(
+                    self, "Método Actualizado",
+                    f"El método de pago fue cambiado exitosamente a {nuevo_metodo}."
+                )
+                self.generar_reportes()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"No se pudo cambiar el método de pago:\n{str(e)}")

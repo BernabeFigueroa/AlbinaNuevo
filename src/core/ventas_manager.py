@@ -233,3 +233,83 @@ class VentasManager:
 
         return True
 
+    @staticmethod
+    def cambiar_metodo_pago(venta_id: int, nuevo_metodo: str = None):
+        """
+        Modifica el método de pago de una venta exclusivamente entre EFECTIVO y TRANSFERENCIA.
+        Si nuevo_metodo es None, alterna automáticamente entre ambos métodos.
+        Actualiza tanto la tabla 'ventas' como 'caja_movimientos'.
+        """
+        supabase = get_supabase()
+
+        # 1. Obtener la venta
+        res_v = supabase.table('ventas').select('*').eq('id', venta_id).execute()
+        if not res_v.data:
+            raise ValueError(f"La venta #{venta_id} no existe.")
+
+        venta = res_v.data[0]
+        if venta.get('estado') in ('ANULADA', 'CANCELADA'):
+            raise ValueError("No se puede modificar el método de pago de una venta anulada.")
+
+        metodo_actual = str(venta.get('metodo_pago') or '').strip().upper()
+        if metodo_actual not in ('EFECTIVO', 'TRANSFERENCIA'):
+            raise ValueError(
+                f"Solo se puede modificar ventas con método EFECTIVO o TRANSFERENCIA. "
+                f"La venta #{venta_id} tiene '{metodo_actual}'."
+            )
+
+        # 2. Determinar y validar el nuevo método
+        if nuevo_metodo is None:
+            nuevo_metodo = 'TRANSFERENCIA' if metodo_actual == 'EFECTIVO' else 'EFECTIVO'
+        else:
+            nuevo_metodo = str(nuevo_metodo).strip().upper()
+
+        if nuevo_metodo not in ('EFECTIVO', 'TRANSFERENCIA'):
+            raise ValueError("El método de pago solo puede cambiarse a EFECTIVO o TRANSFERENCIA.")
+
+        if nuevo_metodo == metodo_actual:
+            return {
+                'success': True,
+                'venta_id': venta_id,
+                'metodo_anterior': metodo_actual,
+                'metodo_nuevo': nuevo_metodo
+            }
+
+        # 3. Intentar RPC atómico
+        rpc_exitoso = False
+        try:
+            res_rpc = supabase.rpc('cambiar_metodo_pago_atomico', {
+                'p_venta_id': venta_id,
+                'p_nuevo_metodo': nuevo_metodo
+            }).execute()
+            if res_rpc.data:
+                rpc_exitoso = True
+        except Exception:
+            rpc_exitoso = False
+
+        # 4. Fallback directo en caso de que la RPC no esté desplegada aún
+        if not rpc_exitoso:
+            supabase.table('ventas').update({
+                'metodo_pago': nuevo_metodo
+            }).eq('id', venta_id).execute()
+
+            caja_sesion_id = venta.get('caja_sesion_id')
+            if caja_sesion_id:
+                try:
+                    movs = supabase.table('caja_movimientos').select('id, descripcion').eq('caja_sesion_id', caja_sesion_id).execute()
+                    for m in (movs.data or []):
+                        desc = str(m.get('descripcion') or '')
+                        if f"Venta #{venta_id}" in desc:
+                            supabase.table('caja_movimientos').update({
+                                'metodo_pago': nuevo_metodo
+                            }).eq('id', m['id']).execute()
+                except Exception as e:
+                    print(f"Advertencia al actualizar caja_movimientos: {e}")
+
+        return {
+            'success': True,
+            'venta_id': venta_id,
+            'metodo_anterior': metodo_actual,
+            'metodo_nuevo': nuevo_metodo
+        }
+

@@ -9,7 +9,7 @@ from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout, QMessageBox, QApplication, QScrollArea, QWidget
 
 # Debe coincidir con el tag del binario que se distribuye.
-CURRENT_VERSION = "1.1.15"
+CURRENT_VERSION = "1.1.16"
 GITHUB_REPO = "BernabeFigueroa/AlbinaNuevo"  # Repositorio oficial para releases/binarios
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 APP_DATA_DIR = os.path.join(

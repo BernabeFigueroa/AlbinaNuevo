@@ -974,8 +974,29 @@ class POSView(QWidget):
                 empresa_nombre="Albina Accesorios"
             )
             
-            if metodo_pago_seleccionado == "EFECTIVO":
-                QMessageBox.information(self, "Venta Exitosa", f"Vuelto a entregar: ${vuelto:.2f}\n\nFactura #{resultado['venta_id']} generada.\nImprimiendo...")
+            if metodo_pago_seleccionado in ("EFECTIVO", "TRANSFERENCIA"):
+                msg_box = QMessageBox(self)
+                msg_box.setWindowTitle("Venta Exitosa")
+                msg_box.setIcon(QMessageBox.Icon.Information)
+                texto = f"Factura #{resultado['venta_id']} generada.\nImprimiendo..."
+                if metodo_pago_seleccionado == "EFECTIVO":
+                    texto = f"Vuelto a entregar: ${vuelto:.2f}\n\n" + texto
+                msg_box.setText(texto)
+                
+                btn_ok = msg_box.addButton("Aceptar", QMessageBox.ButtonRole.AcceptRole)
+                nuevo_m = "TRANSFERENCIA" if metodo_pago_seleccionado == "EFECTIVO" else "EFECTIVO"
+                btn_cambiar = msg_box.addButton(f"Cambiar a {nuevo_m.capitalize()}", QMessageBox.ButtonRole.ActionRole)
+                
+                msg_box.exec()
+                if msg_box.clickedButton() == btn_cambiar:
+                    try:
+                        VentasManager.cambiar_metodo_pago(resultado["venta_id"], nuevo_m)
+                        QMessageBox.information(
+                            self, "Método Modificado",
+                            f"La venta #{resultado['venta_id']} fue cambiada a {nuevo_m.capitalize()} exitosamente."
+                        )
+                    except Exception as err:
+                        QMessageBox.critical(self, "Error", f"No se pudo cambiar el método de pago:\n{str(err)}")
             else:
                 QMessageBox.information(self, "Venta Exitosa", f"Factura #{resultado['venta_id']} generada.\nImprimiendo...")
                 
