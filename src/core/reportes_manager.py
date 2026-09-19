@@ -92,19 +92,22 @@ class ReportesManager:
 
         efectivo = 0.0
         transferencia = 0.0
+        tarjeta = 0.0
         
         ventas_fmt = []
         for v in ventas:
             total = float(v['total'])
-            mp = v['metodo_pago']
+            mp = str(v.get('metodo_pago') or '').strip().upper()
             estado = v.get('estado') or 'COMPLETADA'
             es_anulada = (estado in ('ANULADA', 'CANCELADA'))
             
             if not es_anulada:
                 if mp == 'EFECTIVO':
                     efectivo += total
-                elif mp in ('TRANSFERENCIA', 'TARJETA', 'TARJETA/TRANSFERENCIA'):
+                elif mp == 'TRANSFERENCIA':
                     transferencia += total
+                elif mp in ('TARJETA', 'CARD', 'TARJETA/TRANSFERENCIA'):
+                    tarjeta += total
                 elif mp == 'MIXTO':
                     pass
             
@@ -158,6 +161,7 @@ class ReportesManager:
             'ventas': ventas_fmt,
             'total_efectivo': efectivo,
             'total_transferencia': transferencia,
+            'total_tarjeta': tarjeta,
             'total_general': sum(v['total'] for v in ventas_fmt if not v.get('es_anulada'))
         }
 

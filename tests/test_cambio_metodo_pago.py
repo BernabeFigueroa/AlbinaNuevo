@@ -135,6 +135,96 @@ class CambioMetodoPagoTests(unittest.TestCase):
         dlg4 = DialogoDetalleVenta(4, info_mixto, "<p>Contenido</p>")
         self.assertTrue(dlg4.btn_cambiar_metodo.isHidden())
 
+    def test_reportes_manager_totales_tarjeta_y_general(self):
+        from src.core.reportes_manager import ReportesManager
+        from types import SimpleNamespace
+
+        with patch('src.core.reportes_manager.get_supabase') as mock_sb, \
+             patch('src.core.reportes_manager.ReportesManager._check_permission'):
+            mock_sb.return_value.table.return_value.select.return_value.neq.return_value.gte.return_value.lte.return_value.order.return_value.execute.return_value.data = [
+                {'id': 1, 'fecha': '2026-09-18T10:00:00Z', 'total': 1000.0, 'metodo_pago': 'EFECTIVO', 'estado': 'COMPLETADA', 'nro_comprobante_afip': None, 'tiene_provisorios': False, 'clientes': None, 'usuarios': None},
+                {'id': 2, 'fecha': '2026-09-18T11:00:00Z', 'total': 500.0, 'metodo_pago': 'TRANSFERENCIA', 'estado': 'COMPLETADA', 'nro_comprobante_afip': None, 'tiene_provisorios': False, 'clientes': None, 'usuarios': None},
+                {'id': 3, 'fecha': '2026-09-18T12:00:00Z', 'total': 2000.0, 'metodo_pago': 'TARJETA', 'estado': 'COMPLETADA', 'nro_comprobante_afip': None, 'tiene_provisorios': False, 'clientes': None, 'usuarios': None},
+                {'id': 4, 'fecha': '2026-09-18T13:00:00Z', 'total': 400.0, 'metodo_pago': 'EFECTIVO', 'estado': 'ANULADA', 'nro_comprobante_afip': None, 'tiene_provisorios': False, 'clientes': None, 'usuarios': None}
+            ]
+
+            res = ReportesManager.get_ventas_por_fecha("2026-09-18", "2026-09-18")
+            self.assertEqual(res['total_efectivo'], 1000.0)
+            self.assertEqual(res['total_transferencia'], 500.0)
+            self.assertEqual(res['total_tarjeta'], 2000.0)
+            # Total general debe ser la suma completa de ventas activas sin resta de 35%
+            self.assertEqual(res['total_general'], 3500.0)
+
+    def test_reportes_view_cargar_ventas_tarjeta_descontada_y_general_completo(self):
+        from types import SimpleNamespace
+        from PyQt6.QtWidgets import QLabel, QComboBox, QTableWidget
+        from src.ui.reportes_view import ReportesView
+
+        vista = SimpleNamespace(
+            cb_metodo_pago=QComboBox(),
+            cb_estado=QComboBox(),
+            lbl_tot_efectivo=QLabel(),
+            lbl_tot_transferencia=QLabel(),
+            lbl_tot_tarjeta=QLabel(),
+            lbl_tot_tarjeta_bruto=QLabel(),
+            lbl_tot_general=QLabel(),
+            tabla_ventas=QTableWidget(0, 7)
+        )
+        vista.cb_metodo_pago.addItem('TODOS')
+        vista.cb_estado.addItem('TODAS')
+
+        datos = {
+            'ventas': [
+                {'id': 1, 'fecha': '2026-09-18T10:00:00', 'total': 1000.0, 'metodo_pago': 'EFECTIVO', 'cliente': 'A', 'vendedor': 'B', 'es_anulada': False},
+                {'id': 2, 'fecha': '2026-09-18T11:00:00', 'total': 1000.0, 'metodo_pago': 'TARJETA', 'cliente': 'C', 'vendedor': 'D', 'es_anulada': False}
+            ],
+            'total_efectivo': 1000.0,
+            'total_transferencia': 0.0,
+            'total_tarjeta': 1000.0,
+            'total_general': 2000.0
+        }
+
+        with patch('src.ui.reportes_view.ReportesManager.get_ventas_por_fecha', return_value=datos):
+            ReportesView.cargar_ventas(vista, '2026-09-18', '2026-09-18')
+
+        # Tarjeta debe tener el 35% descontado: 1000 * 0.65 = 650.00
+        self.assertEqual(vista.lbl_tot_tarjeta.text(), "$650.00")
+        self.assertIn("1,000.00", vista.lbl_tot_tarjeta_bruto.text())
+
+        # Total general debe conservarse sin descuento de 35%: 2000.00
+        self.assertEqual(vista.lbl_tot_general.text(), "$2000.00")
+
+    def test_caja_manager_resumen_tarjeta_descontada(self):
+        from src.core.caja_manager import CajaManager
+
+        with patch('src.core.caja_manager.get_supabase') as mock_sb:
+            # 1. Sesión
+            mock_sb.return_value.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
+                {'id': 5, 'monto_inicial': 1000.0, 'estado': 'ABIERTA'}
+            ]
+            # 2. Ventas (select().eq().neq().neq().execute())
+            mock_sb.return_value.table.return_value.select.return_value.eq.return_value.neq.return_value.neq.return_value.execute.return_value.data = [
+                {'id': 1, 'metodo_pago': 'EFECTIVO', 'total': 2000.0},
+                {'id': 2, 'metodo_pago': 'TRANSFERENCIA', 'total': 3000.0},
+                {'id': 3, 'metodo_pago': 'TARJETA', 'total': 10000.0},
+            ]
+            # 3. Movimientos (select().eq().execute())
+            # usa el mismo mock de eq().execute().data pero como ya se leyó sesión, los movimientos pueden ser []
+            mock_sb.return_value.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+                MagicMock(data=[{'id': 5, 'monto_inicial': 1000.0, 'estado': 'ABIERTA'}]),
+                MagicMock(data=[])
+            ]
+
+            resumen = CajaManager.obtener_resumen(5)
+            self.assertEqual(resumen['ventas_efectivo'], 2000.0)
+            self.assertEqual(resumen['ventas_transferencia'], 3000.0)
+            self.assertEqual(resumen['ventas_tarjeta'], 10000.0)
+            # Tarjeta con 35% de descuento: 10000 * 0.65 = 6500.0
+            self.assertEqual(resumen['ventas_tarjeta_descontada'], 6500.0)
+            self.assertEqual(resumen['total_vendido'], 15000.0)
+
 
 if __name__ == '__main__':
     unittest.main()
+
+

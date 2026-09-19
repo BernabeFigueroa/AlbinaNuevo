@@ -174,6 +174,8 @@ class CajaManager:
             'usuario_nombre': 'Desconocido',
             'ventas_efectivo': 0.0,
             'ventas_transferencia': 0.0,
+            'ventas_tarjeta': 0.0,
+            'ventas_tarjeta_descontada': 0.0,
             'ventas_fiadas': 0.0,
             'ventas_otros': 0.0,
             'ingresos_manuales': 0.0,
@@ -218,7 +220,9 @@ class CajaManager:
                     resumen['ventas_fiadas'] += total_v
                 elif mp == 'MIXTO':
                     resumen['ventas_otros'] += total_v
-                elif mp in ['TRANSFERENCIA', 'TARJETA']:
+                elif mp in ['TARJETA', 'CARD']:
+                    resumen['ventas_tarjeta'] += total_v
+                elif mp in ['TRANSFERENCIA', 'TARJETA/TRANSFERENCIA']:
                     resumen['ventas_transferencia'] += total_v
                 elif mp == 'EFECTIVO':
                     resumen['ventas_efectivo'] += total_v
@@ -251,6 +255,8 @@ class CajaManager:
                         resumen['ventas_efectivo'] += monto_m
                     elif mp == 'TRANSFERENCIA':
                         resumen['ventas_transferencia'] += monto_m
+                    elif mp in ['TARJETA', 'CARD']:
+                        resumen['ventas_tarjeta'] += monto_m
                     # Descontar de ventas_otros para que no duplique en total_vendido
                     resumen['ventas_otros'] = max(0.0, resumen['ventas_otros'] - monto_m)
                     continue
@@ -271,7 +277,14 @@ class CajaManager:
             print(f"Error en obtener_resumen movimientos: {e}")
             pass
             
-        resumen['total_vendido'] = resumen['ventas_efectivo'] + resumen['ventas_transferencia'] + resumen['ventas_fiadas'] + resumen['ventas_otros']
+        resumen['ventas_tarjeta_descontada'] = resumen['ventas_tarjeta'] * 0.65
+        resumen['total_vendido'] = (
+            resumen['ventas_efectivo'] + 
+            resumen['ventas_transferencia'] + 
+            resumen['ventas_tarjeta'] + 
+            resumen['ventas_fiadas'] + 
+            resumen['ventas_otros']
+        )
                     
         # 4. Calcular total efectivo esperado
         resumen['total_efectivo_esperado'] = (

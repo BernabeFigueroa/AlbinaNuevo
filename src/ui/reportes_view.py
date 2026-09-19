@@ -542,7 +542,7 @@ class ReportesView(QWidget):
         filtro_layout.addWidget(self.lbl_pago)
         from PyQt6.QtWidgets import QComboBox
         self.cb_metodo_pago = QComboBox()
-        self.cb_metodo_pago.addItems(["TODOS", "EFECTIVO", "TRANSFERENCIA", "MIXTO", "CUENTA CORRIENTE"])
+        self.cb_metodo_pago.addItems(["TODOS", "EFECTIVO", "TRANSFERENCIA", "TARJETA", "MIXTO", "CUENTA CORRIENTE"])
         filtro_layout.addWidget(self.cb_metodo_pago)
 
         self.lbl_estado = QLabel("Estado:")
@@ -699,12 +699,14 @@ class ReportesView(QWidget):
         
         self.frame_efectivo, self.lbl_tot_efectivo = self.crear_tarjeta_resumen("EFECTIVO", "$0.00", "#B09886")
         self.frame_transferencia, self.lbl_tot_transferencia = self.crear_tarjeta_resumen("TRANSFERENCIA", "$0.00", "#000000")
-        self.frame_general, self.lbl_tot_general, self.lbl_tot_general_bruto = self.crear_tarjeta_resumen(
-            "TOTAL GENERAL (-35%)", "$0.00", "#D99890", subtitulo="Bruto: $0.00"
+        self.frame_tarjeta, self.lbl_tot_tarjeta, self.lbl_tot_tarjeta_bruto = self.crear_tarjeta_resumen(
+            "TARJETA (-35%)", "$0.00", "#7A7067", subtitulo="Bruto: $0.00"
         )
+        self.frame_general, self.lbl_tot_general = self.crear_tarjeta_resumen("TOTAL GENERAL", "$0.00", "#D99890")
         
         resumen_layout.addWidget(self.frame_efectivo)
         resumen_layout.addWidget(self.frame_transferencia)
+        resumen_layout.addWidget(self.frame_tarjeta)
         resumen_layout.addWidget(self.frame_general)
         
         layout.addLayout(resumen_layout)
@@ -792,6 +794,7 @@ class ReportesView(QWidget):
                 <tr><td style="color: #7A7067; font-size: 13px;">Saldo Inicial:</td><td align="right" style="color: #2C2520; font-weight: 600; font-size: 13px;">$ {resumen['monto_inicial']:,.2f}</td></tr>
                 <tr><td style="color: #7A7067; font-size: 13px;">+ Ventas Efectivo:</td><td align="right" style="color: #B09886; font-weight: 600; font-size: 13px;">$ {resumen['ventas_efectivo']:,.2f}</td></tr>
                 <tr><td style="color: #7A7067; font-size: 13px;">+ Ventas Transferencia:</td><td align="right" style="color: #2C2520; font-weight: 600; font-size: 13px;">$ {resumen['ventas_transferencia']:,.2f}</td></tr>
+                <tr><td style="color: #7A7067; font-size: 13px;">+ Ventas Tarjeta (-35%):</td><td align="right" style="color: #2C2520; font-weight: 600; font-size: 13px;">$ {resumen.get('ventas_tarjeta_descontada', 0.0):,.2f}</td></tr>
                 <tr><td style="color: #7A7067; font-size: 13px;">+ Ventas Fiadas:</td><td align="right" style="color: #7A7067; font-weight: 600; font-size: 13px;">$ {resumen['ventas_fiadas']:,.2f}</td></tr>
                 <tr><td style="color: #7A7067; font-size: 13px;">+ Cobros Deuda (Evo):</td><td align="right" style="color: #B09886; font-weight: 600; font-size: 13px;">$ {resumen['pagos_deuda_efectivo']:,.2f}</td></tr>
                 <tr><td style="color: #7A7067; font-size: 13px;">+ Cobros Deuda (Trans):</td><td align="right" style="color: #2C2520; font-weight: 600; font-size: 13px;">$ {resumen['pagos_deuda_transferencia']:,.2f}</td></tr>
@@ -1009,18 +1012,26 @@ class ReportesView(QWidget):
             data = ReportesManager.get_ventas_por_fecha(desde, hasta, metodo_filtro, usuario_id)
         
         total_gen = float(data.get('total_general') or 0.0)
-        total_descontado = total_gen * 0.65  # Valor con el 35% restado
+        total_efectivo = float(data.get('total_efectivo') or 0.0)
+        total_transferencia = float(data.get('total_transferencia') or 0.0)
+        total_tarjeta = float(data.get('total_tarjeta') or 0.0)
+        tarjeta_descontada = total_tarjeta * 0.65  # Valor de tarjeta con el 35% restado
 
-        self.lbl_tot_efectivo.setText(f"${data['total_efectivo']:.2f}")
-        self.lbl_tot_transferencia.setText(f"${data['total_transferencia']:.2f}")
-        self.lbl_tot_general.setText(f"${total_descontado:.2f}")
-        self.lbl_tot_general.setToolTip(
-            f"Total bruto: ${total_gen:,.2f}\n"
-            f"Menos 35%: -${(total_gen * 0.35):,.2f}\n"
-            f"Total (-35%): ${total_descontado:,.2f}"
-        )
-        if hasattr(self, 'lbl_tot_general_bruto') and self.lbl_tot_general_bruto is not None:
-            self.lbl_tot_general_bruto.setText(f"Bruto: ${total_gen:,.2f}")
+        self.lbl_tot_efectivo.setText(f"${total_efectivo:.2f}")
+        self.lbl_tot_transferencia.setText(f"${total_transferencia:.2f}")
+
+        if hasattr(self, 'lbl_tot_tarjeta'):
+            self.lbl_tot_tarjeta.setText(f"${tarjeta_descontada:.2f}")
+            self.lbl_tot_tarjeta.setToolTip(
+                f"Total tarjeta bruto: ${total_tarjeta:,.2f}\n"
+                f"Menos 35%: -${(total_tarjeta * 0.35):,.2f}\n"
+                f"Total tarjeta (-35%): ${tarjeta_descontada:,.2f}"
+            )
+        if hasattr(self, 'lbl_tot_tarjeta_bruto') and self.lbl_tot_tarjeta_bruto is not None:
+            self.lbl_tot_tarjeta_bruto.setText(f"Bruto: ${total_tarjeta:,.2f}")
+
+        self.lbl_tot_general.setText(f"${total_gen:.2f}")
+        self.lbl_tot_general.setToolTip(f"Total general: ${total_gen:,.2f}")
         
         self.tabla_ventas.setRowCount(0)
         for v in data['ventas']:

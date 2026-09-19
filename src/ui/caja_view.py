@@ -472,6 +472,7 @@ class CajaView(QWidget):
             ("Saldo Inicial", "monto_inicial", "#7A7067"),
             ("Ventas Efectivo", "ventas_efectivo", "#B09886"),
             ("Ventas Transferencia", "ventas_transferencia", "#B09886"),
+            ("Ventas Tarjeta (-35%)", "ventas_tarjeta_descontada", "#B09886"),
             ("Ventas Fiadas", "ventas_fiadas", "#7A7067"),
             ("Cobros Deuda (Evo)", "pagos_deuda_efectivo", "#B09886"),
             ("Cobros Deuda (Trans)", "pagos_deuda_transferencia", "#B09886"),
@@ -628,6 +629,15 @@ class CajaView(QWidget):
         for clave, lbl in self.lbl_valores.items():
             valor = resumen.get(clave, 0.0)
             lbl.setText(f"$ {valor:,.2f}")
+            
+        if 'ventas_tarjeta_descontada' in self.lbl_valores:
+            v_bruto = resumen.get('ventas_tarjeta', 0.0)
+            v_neto = resumen.get('ventas_tarjeta_descontada', 0.0)
+            self.lbl_valores['ventas_tarjeta_descontada'].setToolTip(
+                f"Ventas tarjeta bruto: ${v_bruto:,.2f}\n"
+                f"Menos 35%: -${(v_bruto * 0.35):,.2f}\n"
+                f"Total neto (-35%): ${v_neto:,.2f}"
+            )
             
         self.lbl_saldo_efectivo.setText(f"$ {resumen.get('total_efectivo_esperado', 0.0):,.2f}")
         self.lbl_total_vendido.setText(f"$ {resumen.get('total_vendido', 0.0):,.2f}")
