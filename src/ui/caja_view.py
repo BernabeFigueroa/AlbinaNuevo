@@ -641,6 +641,12 @@ class CajaView(QWidget):
             
         self.lbl_saldo_efectivo.setText(f"$ {resumen.get('total_efectivo_esperado', 0.0):,.2f}")
         self.lbl_total_vendido.setText(f"$ {resumen.get('total_vendido', 0.0):,.2f}")
+        self.lbl_total_vendido.setToolTip(
+            f"Efectivo: ${resumen.get('ventas_efectivo', 0.0):,.2f}\n"
+            f"+ Transferencia: ${resumen.get('ventas_transferencia', 0.0):,.2f}\n"
+            f"+ Tarjeta (-35%): ${resumen.get('ventas_tarjeta_descontada', 0.0):,.2f}\n"
+            f"Total Vendido: ${resumen.get('total_vendido', 0.0):,.2f}"
+        )
         
         # Cargar tabla de movimientos
         self.tabla_movs.setRowCount(0)

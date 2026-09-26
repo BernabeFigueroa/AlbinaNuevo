@@ -281,7 +281,7 @@ class CajaManager:
         resumen['total_vendido'] = (
             resumen['ventas_efectivo'] + 
             resumen['ventas_transferencia'] + 
-            resumen['ventas_tarjeta'] + 
+            resumen['ventas_tarjeta_descontada'] + 
             resumen['ventas_fiadas'] + 
             resumen['ventas_otros']
         )

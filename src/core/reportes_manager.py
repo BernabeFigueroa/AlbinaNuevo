@@ -90,6 +90,31 @@ class ReportesManager:
             except Exception:
                 pass
 
+        # Manejar desglose de ventas MIXTO si existen
+        ventas_mixtas_ids = [
+            v['id'] for v in ventas 
+            if str(v.get('metodo_pago') or '').strip().upper() == 'MIXTO' 
+            and (v.get('estado') or 'COMPLETADA') not in ('ANULADA', 'CANCELADA')
+        ]
+        mixtos_desglose = defaultdict(lambda: {'EFECTIVO': 0.0, 'TRANSFERENCIA': 0.0, 'TARJETA': 0.0})
+        if ventas_mixtas_ids:
+            try:
+                res_movs = supabase.table('caja_movimientos').select('metodo_pago, monto, descripcion').eq('tipo', 'VENTA').like('descripcion', '%(Mixto)%').execute()
+                for m in (res_movs.data or []):
+                    desc = m.get('descripcion') or ''
+                    if 'Venta #' in desc and '(Mixto)' in desc:
+                        try:
+                            v_id_part = desc.split('Venta #')[1].split(' ')[0]
+                            v_id = int(v_id_part)
+                            if v_id in ventas_mixtas_ids:
+                                m_mp = str(m.get('metodo_pago') or '').strip().upper()
+                                m_monto = float(m.get('monto') or 0.0)
+                                mixtos_desglose[v_id][m_mp] += m_monto
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
         efectivo = 0.0
         transferencia = 0.0
         tarjeta = 0.0
@@ -109,7 +134,12 @@ class ReportesManager:
                 elif mp in ('TARJETA', 'CARD', 'TARJETA/TRANSFERENCIA'):
                     tarjeta += total
                 elif mp == 'MIXTO':
-                    pass
+                    if v['id'] in mixtos_desglose:
+                        efectivo += mixtos_desglose[v['id']]['EFECTIVO']
+                        transferencia += mixtos_desglose[v['id']]['TRANSFERENCIA']
+                        tarjeta += mixtos_desglose[v['id']]['TARJETA']
+                    else:
+                        efectivo += total
             
             vendedor = 'Sistema'
             if v.get('usuarios'):
@@ -157,12 +187,26 @@ class ReportesManager:
                 'detalle_modificacion': nota_mod if tiene_mod_precio else None
             })
             
+        tarjeta_descontada = tarjeta * 0.65
+
+        if metodo_pago in ('TARJETA', 'CARD'):
+            total_general = tarjeta_descontada
+        elif metodo_pago == 'EFECTIVO':
+            total_general = efectivo
+        elif metodo_pago == 'TRANSFERENCIA':
+            total_general = transferencia
+        elif metodo_pago and metodo_pago not in ('TODOS', 'EFECTIVO', 'TRANSFERENCIA', 'TARJETA', 'CARD'):
+            total_general = sum(v['total'] for v in ventas_fmt if not v.get('es_anulada'))
+        else:
+            total_general = efectivo + transferencia + tarjeta_descontada
+
         return {
             'ventas': ventas_fmt,
             'total_efectivo': efectivo,
             'total_transferencia': transferencia,
             'total_tarjeta': tarjeta,
-            'total_general': sum(v['total'] for v in ventas_fmt if not v.get('es_anulada'))
+            'total_tarjeta_descontada': tarjeta_descontada,
+            'total_general': total_general
         }
 
     @staticmethod

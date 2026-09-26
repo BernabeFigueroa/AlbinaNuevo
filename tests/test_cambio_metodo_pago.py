@@ -152,8 +152,8 @@ class CambioMetodoPagoTests(unittest.TestCase):
             self.assertEqual(res['total_efectivo'], 1000.0)
             self.assertEqual(res['total_transferencia'], 500.0)
             self.assertEqual(res['total_tarjeta'], 2000.0)
-            # Total general debe ser la suma completa de ventas activas sin resta de 35%
-            self.assertEqual(res['total_general'], 3500.0)
+            # Total general debe ser la suma de efectivo + transferencia + tarjeta (-35%): 1000 + 500 + 1300 = 2800.0
+            self.assertEqual(res['total_general'], 2800.0)
 
     def test_reportes_view_cargar_ventas_tarjeta_descontada_y_general_completo(self):
         from types import SimpleNamespace
@@ -181,7 +181,8 @@ class CambioMetodoPagoTests(unittest.TestCase):
             'total_efectivo': 1000.0,
             'total_transferencia': 0.0,
             'total_tarjeta': 1000.0,
-            'total_general': 2000.0
+            'total_tarjeta_descontada': 650.0,
+            'total_general': 1650.0
         }
 
         with patch('src.ui.reportes_view.ReportesManager.get_ventas_por_fecha', return_value=datos):
@@ -191,8 +192,8 @@ class CambioMetodoPagoTests(unittest.TestCase):
         self.assertEqual(vista.lbl_tot_tarjeta.text(), "$650.00")
         self.assertIn("1,000.00", vista.lbl_tot_tarjeta_bruto.text())
 
-        # Total general debe conservarse sin descuento de 35%: 2000.00
-        self.assertEqual(vista.lbl_tot_general.text(), "$2000.00")
+        # Total general debe ser efectivo + transferencia + tarjeta (-35%): 1650.00
+        self.assertEqual(vista.lbl_tot_general.text(), "$1650.00")
 
     def test_caja_manager_resumen_tarjeta_descontada(self):
         from src.core.caja_manager import CajaManager
@@ -221,7 +222,8 @@ class CambioMetodoPagoTests(unittest.TestCase):
             self.assertEqual(resumen['ventas_tarjeta'], 10000.0)
             # Tarjeta con 35% de descuento: 10000 * 0.65 = 6500.0
             self.assertEqual(resumen['ventas_tarjeta_descontada'], 6500.0)
-            self.assertEqual(resumen['total_vendido'], 15000.0)
+            # Total vendido sumando tarjeta descontada (-35%): 2000 + 3000 + 6500 = 11500.0
+            self.assertEqual(resumen['total_vendido'], 11500.0)
 
 
 if __name__ == '__main__':

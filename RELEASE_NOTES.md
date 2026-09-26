@@ -1,7 +1,6 @@
-# Albina Accesorios v1.1.17
+# Albina Accesorios v1.1.18
 
-- Total General en Reportes restaurado a su cálculo original completo, sin el descuento del 35%.
-- La reducción del 35% ahora se aplica específicamente a las ventas realizadas con Tarjeta ("TARJETA (-35%)"), con tooltip explicativo y desglose del valor bruto.
-- Se incorpora la tarjeta resumen de Tarjeta y la opción de filtro por Tarjeta en la vista de Reportes.
-- Se añade el desglose de "Ventas Tarjeta (-35%)" en el panel de Resumen de Caja y en el detalle de cierre de turno.
-- Se mantiene la posibilidad de alternar el método de pago entre Efectivo y Transferencia en ventas ya realizadas.
+- En el Reporte de Caja (cierre de turno y resumen), el "Total Vendido" ahora suma las ventas con tarjeta con su descuento del 35% aplicado (valor neto en lugar del bruto).
+- En el Reporte de Ventas, el "Total General" suma de manera consistente: Efectivo + Transferencia + Tarjeta (-35%).
+- Desglose y suma automática de los cobros en ventas Mixtas hacia los montos correspondientes de Efectivo y Transferencia.
+- Se mantienen las tarjetas de resumen y tooltips informativos con el desglose detallado de valores brutos y descuentos.

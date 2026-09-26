@@ -1011,11 +1011,11 @@ class ReportesView(QWidget):
         if data is None:
             data = ReportesManager.get_ventas_por_fecha(desde, hasta, metodo_filtro, usuario_id)
         
-        total_gen = float(data.get('total_general') or 0.0)
         total_efectivo = float(data.get('total_efectivo') or 0.0)
         total_transferencia = float(data.get('total_transferencia') or 0.0)
         total_tarjeta = float(data.get('total_tarjeta') or 0.0)
-        tarjeta_descontada = total_tarjeta * 0.65  # Valor de tarjeta con el 35% restado
+        tarjeta_descontada = float(data.get('total_tarjeta_descontada') if data.get('total_tarjeta_descontada') is not None else (total_tarjeta * 0.65))
+        total_gen = float(data.get('total_general') if data.get('total_general') is not None else (total_efectivo + total_transferencia + tarjeta_descontada))
 
         self.lbl_tot_efectivo.setText(f"${total_efectivo:.2f}")
         self.lbl_tot_transferencia.setText(f"${total_transferencia:.2f}")
@@ -1031,7 +1031,12 @@ class ReportesView(QWidget):
             self.lbl_tot_tarjeta_bruto.setText(f"Bruto: ${total_tarjeta:,.2f}")
 
         self.lbl_tot_general.setText(f"${total_gen:.2f}")
-        self.lbl_tot_general.setToolTip(f"Total general: ${total_gen:,.2f}")
+        self.lbl_tot_general.setToolTip(
+            f"Efectivo: ${total_efectivo:,.2f}\n"
+            f"+ Transferencia: ${total_transferencia:,.2f}\n"
+            f"+ Tarjeta (-35%): ${tarjeta_descontada:,.2f}\n"
+            f"Total General: ${total_gen:,.2f}"
+        )
         
         self.tabla_ventas.setRowCount(0)
         for v in data['ventas']:
