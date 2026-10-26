@@ -15,6 +15,14 @@ class VentasManager:
         if not carrito:
             raise ValueError("No se puede procesar una venta sin artículos.")
 
+        # Compatibilidad defensiva con versiones anteriores del RPC: una venta
+        # fiada debe enviar también precio_unitario al valor de contado. Así el
+        # total no vuelve a precio de tarjeta aunque la migración del servidor
+        # todavía no se haya aplicado.
+        es_fiado = str(metodo_pago or '').strip().upper() in (
+            'FIADO / CTA. CTE.', 'FIADO', 'CUENTA CORRIENTE'
+        )
+
         # La base de datos es la frontera transaccional: venta, detalle, stock,
         # caja y cuenta corriente se confirman juntos o se revierten juntos.
         # Sólo se envían los datos necesarios, nunca referencias de widgets/UI.
@@ -28,6 +36,8 @@ class VentasManager:
             costo = float(item.get('costo_unitario', 0)) if es_provisorio else 0
             precio = float(item['precio_unitario'])
             contado = float(item.get('precio_contado', precio))
+            if es_fiado:
+                precio = contado
             if any(not isfinite(valor) or valor < 0 for valor in (precio, contado, costo)):
                 raise ValueError("Los precios y el costo deben ser números válidos mayores o iguales a cero.")
             if es_provisorio and (not descripcion or item.get('producto_id') is not None or item.get('promocion_id') is not None):

@@ -62,6 +62,15 @@ class VentasProvisoriasTests(unittest.TestCase):
             VentasManager.procesar_venta(1, 'EFECTIVO', [provisorio()])
         self.db.rpc.assert_not_called()
 
+    def test_fiado_envia_precio_contado_incluso_a_rpc_anterior(self):
+        item = provisorio()
+
+        VentasManager.procesar_venta(6, 'FIADO / CTA. CTE.', [item])
+
+        enviado = self.db.rpc.call_args.args[1]['p_carrito'][0]
+        self.assertEqual(enviado['precio_unitario'], 100)
+        self.assertEqual(enviado['precio_contado'], 100)
+
     def test_detalle_recupera_nombre_y_marca_sin_producto(self):
         self.db.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
             dict(descripcion='Bolsa', es_provisorio=True, productos=None,

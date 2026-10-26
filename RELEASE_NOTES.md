@@ -1,7 +1,6 @@
-# Albina Accesorios v1.1.19
+# Albina Accesorios v1.1.20
 
-- Las ventas fiadas quedan registradas en Ventas y Cuenta Corriente, pero ya no se muestran ni se suman en la caja del día hasta que se cobra la deuda.
-- Los cobros de cuenta corriente ingresan en la caja activa según el importe y medio de pago efectivamente recibido.
-- Las ventas fiadas ahora utilizan el precio de contado/efectivo.
-- El detalle de las ventas desde Deudores usa el mismo diálogo completo de Reportes, con desplazamiento para ventas extensas.
-- Se incorpora la migración de base de datos necesaria para aplicar el precio de efectivo a las ventas fiadas.
+- Las ventas fiadas envían siempre el precio de contado, incluso cuando el servidor todavía utiliza una versión anterior de la función de ventas.
+- Se evita que los artículos provisorios de una venta fiada se registren con el recargo del 35% correspondiente a tarjeta.
+- Se incorpora una corrección segura e idempotente para la venta #799 de Daniela Slame: total y deuda pasan de $440.909 a $403.984.
+- La corrección histórica valida todos los importes esperados y se revierte completa si encuentra datos diferentes, sin modificar otras ventas.
