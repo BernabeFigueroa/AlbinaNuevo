@@ -213,6 +213,30 @@ class ArticulosUITests(unittest.TestCase):
         self.assertIn('Provisorio', aviso.text())
         self.assertIn('stock', aviso.toolTip())
 
+    def test_pos_fiado_usa_precio_contado(self):
+        vista = POSView()
+        item = {
+            'producto_id': 10,
+            'codigo_barras': '12345',
+            'nombre': 'Accesorio',
+            'talle': '',
+            'cantidad': 2,
+            'precio_unitario': 150.0,
+            'precio_contado': 100.0,
+            'precio_tarjeta': 150.0,
+            'es_promo': False
+        }
+        vista.carrito.append(item)
+        vista.cb_medio_pago.setCurrentText("FIADO / CTA. CTE.")
+        vista.actualizar_tabla()
+
+        # Debe mostrar precio_contado (100.00) en lugar de precio_tarjeta (150.00)
+        item_pu = vista.tabla_carrito.item(0, 4)
+        item_subt = vista.tabla_carrito.item(0, 5)
+        self.assertEqual(item_pu.text(), "100.00")
+        self.assertEqual(item_subt.text(), "200.00")
+        self.assertEqual(vista.lbl_total.text(), "$200.00")
+
 
 if __name__ == '__main__':
     unittest.main()

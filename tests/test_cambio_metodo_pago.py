@@ -135,6 +135,12 @@ class CambioMetodoPagoTests(unittest.TestCase):
         dlg4 = DialogoDetalleVenta(4, info_mixto, "<p>Contenido</p>")
         self.assertTrue(dlg4.btn_cambiar_metodo.isHidden())
 
+        # Verificar que el diálogo incluye un QScrollArea para ver todos los artículos
+        from PyQt6.QtWidgets import QScrollArea
+        scroll = dlg.findChild(QScrollArea)
+        self.assertIsNotNone(scroll)
+        self.assertTrue(scroll.widgetResizable())
+
     def test_reportes_manager_totales_tarjeta_y_general(self):
         from src.core.reportes_manager import ReportesManager
         from types import SimpleNamespace
@@ -225,8 +231,29 @@ class CambioMetodoPagoTests(unittest.TestCase):
             # Total vendido sumando tarjeta descontada (-35%): 2000 + 3000 + 6500 = 11500.0
             self.assertEqual(resumen['total_vendido'], 11500.0)
 
+    def test_caja_no_suma_venta_fiada_hasta_que_se_cobra(self):
+        from src.core.caja_manager import CajaManager
+
+        with patch('src.core.caja_manager.get_supabase') as mock_sb:
+            mock_sb.return_value.table.return_value.select.return_value.eq.return_value.neq.return_value.neq.return_value.execute.return_value.data = [
+                {'id': 4, 'metodo_pago': 'FIADO / CTA. CTE.', 'total': 5000.0},
+            ]
+            mock_sb.return_value.table.return_value.select.return_value.eq.return_value.execute.side_effect = [
+                MagicMock(data=[{'id': 5, 'monto_inicial': 1000.0, 'estado': 'ABIERTA'}]),
+                MagicMock(data=[{
+                    'tipo': 'INGRESO', 'metodo_pago': 'EFECTIVO', 'monto': 2000.0,
+                    'descripcion': 'Cobro Cta. Cte. Cliente #8'
+                }]),
+            ]
+
+            resumen = CajaManager.obtener_resumen(5)
+
+            self.assertEqual(resumen['ventas_fiadas'], 5000.0)
+            self.assertEqual(resumen['total_vendido'], 0.0)
+            self.assertEqual(resumen['pagos_deuda_efectivo'], 2000.0)
+            self.assertEqual(resumen['total_efectivo_esperado'], 3000.0)
+
 
 if __name__ == '__main__':
     unittest.main()
-
 

@@ -20,7 +20,7 @@ def formatear_fecha_ar(fecha_str):
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, 
     QTableWidgetItem, QPushButton, QHeaderView, QDateEdit, QTabWidget, QFrame,
-    QLineEdit, QMenu
+    QLineEdit, QMenu, QScrollArea
 )
 from PyQt6.QtCore import Qt, QDate, pyqtSignal
 from PyQt6.QtGui import QFont, QColor, QAction
@@ -86,7 +86,39 @@ class DialogoDetalleModerno(QDialog):
         lbl_contenido.setWordWrap(True)
         lbl_contenido.setTextFormat(Qt.TextFormat.RichText)
         frame_layout.addWidget(lbl_contenido)
-        layout.addWidget(frame)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setStyleSheet("""
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: #F4EFE6;
+                width: 10px;
+                margin: 0px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical {
+                background: #B09886;
+                min-height: 25px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #9C8573;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """)
+        scroll.setWidget(frame)
+        layout.addWidget(scroll, 1)
         
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
@@ -212,7 +244,8 @@ class DialogoDetalleVenta(QDialog):
         self.venta_id = venta_id
         self.info_venta = info_venta or {}
         self.setWindowTitle(f"Detalle de Venta #{venta_id:08d}")
-        self.setMinimumWidth(520)
+        self.setMinimumWidth(540)
+        self.resize(560, 680)
         self.setStyleSheet("""
             QDialog {
                 background-color: #FAF8F5;
@@ -358,7 +391,40 @@ class DialogoDetalleVenta(QDialog):
         lbl_contenido.setWordWrap(True)
         lbl_contenido.setTextFormat(Qt.TextFormat.RichText)
         frame_layout.addWidget(lbl_contenido)
-        layout.addWidget(frame)
+
+        # Scroll area para ver todos los artículos cuando la venta es extensa
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll.setStyleSheet("""
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: #F4EFE6;
+                width: 10px;
+                margin: 0px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical {
+                background: #B09886;
+                min-height: 25px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #9C8573;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """)
+        self.scroll.setWidget(frame)
+        layout.addWidget(self.scroll, 1)
         
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
@@ -795,7 +861,6 @@ class ReportesView(QWidget):
                 <tr><td style="color: #7A7067; font-size: 13px;">+ Ventas Efectivo:</td><td align="right" style="color: #B09886; font-weight: 600; font-size: 13px;">$ {resumen['ventas_efectivo']:,.2f}</td></tr>
                 <tr><td style="color: #7A7067; font-size: 13px;">+ Ventas Transferencia:</td><td align="right" style="color: #2C2520; font-weight: 600; font-size: 13px;">$ {resumen['ventas_transferencia']:,.2f}</td></tr>
                 <tr><td style="color: #7A7067; font-size: 13px;">+ Ventas Tarjeta (-35%):</td><td align="right" style="color: #2C2520; font-weight: 600; font-size: 13px;">$ {resumen.get('ventas_tarjeta_descontada', 0.0):,.2f}</td></tr>
-                <tr><td style="color: #7A7067; font-size: 13px;">+ Ventas Fiadas:</td><td align="right" style="color: #7A7067; font-weight: 600; font-size: 13px;">$ {resumen['ventas_fiadas']:,.2f}</td></tr>
                 <tr><td style="color: #7A7067; font-size: 13px;">+ Cobros Deuda (Evo):</td><td align="right" style="color: #B09886; font-weight: 600; font-size: 13px;">$ {resumen['pagos_deuda_efectivo']:,.2f}</td></tr>
                 <tr><td style="color: #7A7067; font-size: 13px;">+ Cobros Deuda (Trans):</td><td align="right" style="color: #2C2520; font-weight: 600; font-size: 13px;">$ {resumen['pagos_deuda_transferencia']:,.2f}</td></tr>
                 <tr><td style="color: #7A7067; font-size: 13px;">+ Ingresos Manuales:</td><td align="right" style="color: #B09886; font-weight: 600; font-size: 13px;">$ {resumen['ingresos_manuales']:,.2f}</td></tr>
@@ -1276,6 +1341,10 @@ class ReportesView(QWidget):
             return
         venta_id = int(item_id.text())
         
+        self.abrir_dialogo_detalle_venta(self, venta_id, callback_actualizar=self.generar_reportes)
+
+    @staticmethod
+    def abrir_dialogo_detalle_venta(parent, venta_id: int, callback_actualizar=None):
         from src.core.ventas_manager import VentasManager
         res_detalles = VentasManager.get_detalles_venta(venta_id)
         
@@ -1288,8 +1357,8 @@ class ReportesView(QWidget):
 
         if not detalles:
             from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.information(self, "Detalle", "No hay detalles para esta venta.")
-            return
+            QMessageBox.information(parent, "Detalle", "No hay detalles para esta venta.")
+            return None
 
         html_aviso = ""
         nota_comprobante = info_venta.get('nro_comprobante_afip')
@@ -1349,10 +1418,12 @@ class ReportesView(QWidget):
         </table>
         {html_anulada}
         """
-        dialog = DialogoDetalleVenta(venta_id, info_venta, html, self)
-        dialog.anulacion_exitosa.connect(self.generar_reportes)
-        dialog.cambio_metodo_exitoso.connect(self.generar_reportes)
+        dialog = DialogoDetalleVenta(venta_id, info_venta, html, parent)
+        if callback_actualizar:
+            dialog.anulacion_exitosa.connect(callback_actualizar)
+            dialog.cambio_metodo_exitoso.connect(callback_actualizar)
         dialog.exec()
+        return dialog
 
     def mostrar_menu_contextual_ventas(self, pos):
         row = self.tabla_ventas.rowAt(pos.y())

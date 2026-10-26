@@ -1,6 +1,7 @@
-# Albina Accesorios v1.1.18
+# Albina Accesorios v1.1.19
 
-- En el Reporte de Caja (cierre de turno y resumen), el "Total Vendido" ahora suma las ventas con tarjeta con su descuento del 35% aplicado (valor neto en lugar del bruto).
-- En el Reporte de Ventas, el "Total General" suma de manera consistente: Efectivo + Transferencia + Tarjeta (-35%).
-- Desglose y suma automática de los cobros en ventas Mixtas hacia los montos correspondientes de Efectivo y Transferencia.
-- Se mantienen las tarjetas de resumen y tooltips informativos con el desglose detallado de valores brutos y descuentos.
+- Las ventas fiadas quedan registradas en Ventas y Cuenta Corriente, pero ya no se muestran ni se suman en la caja del día hasta que se cobra la deuda.
+- Los cobros de cuenta corriente ingresan en la caja activa según el importe y medio de pago efectivamente recibido.
+- Las ventas fiadas ahora utilizan el precio de contado/efectivo.
+- El detalle de las ventas desde Deudores usa el mismo diálogo completo de Reportes, con desplazamiento para ventas extensas.
+- Se incorpora la migración de base de datos necesaria para aplicar el precio de efectivo a las ventas fiadas.

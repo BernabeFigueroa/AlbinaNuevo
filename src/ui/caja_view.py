@@ -473,7 +473,6 @@ class CajaView(QWidget):
             ("Ventas Efectivo", "ventas_efectivo", "#B09886"),
             ("Ventas Transferencia", "ventas_transferencia", "#B09886"),
             ("Ventas Tarjeta (-35%)", "ventas_tarjeta_descontada", "#B09886"),
-            ("Ventas Fiadas", "ventas_fiadas", "#7A7067"),
             ("Cobros Deuda (Evo)", "pagos_deuda_efectivo", "#B09886"),
             ("Cobros Deuda (Trans)", "pagos_deuda_transferencia", "#B09886"),
             ("Ingresos Manuales", "ingresos_manuales", "#B09886"),

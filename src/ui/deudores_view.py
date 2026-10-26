@@ -104,18 +104,9 @@ class DeudoresView(QWidget):
         if not venta_id:
             return  # No es una venta (probablemente sea un pago o ajuste)
             
-        from src.core.ventas_manager import VentasManager
+        from src.ui.reportes_view import ReportesView
         try:
-            res_detalles = VentasManager.get_detalles_venta(venta_id)
-            if isinstance(res_detalles, dict):
-                detalles = res_detalles.get('detalles', [])
-            else:
-                detalles = res_detalles
-            texto = f"Detalle de la Venta #{venta_id}:\n\n"
-            for d in detalles:
-                texto += f"- {d['cantidad']} x {d['nombre']} (${float(d['precio_unitario']):.2f}) = ${float(d['subtotal']):.2f}\n"
-            
-            QMessageBox.information(self, f"Detalle de Compra", texto)
+            ReportesView.abrir_dialogo_detalle_venta(self, venta_id, callback_actualizar=self.cargar_datos_cliente)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"No se pudo cargar el detalle:\n{str(e)}")
 
