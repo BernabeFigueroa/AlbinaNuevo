@@ -20,3 +20,9 @@ Desktop.ini
 
 # Compilaciones PyInstaller
 build/
+
+# Accesos directos y carpetas locales
+*.lnk
+exports/
+.agents/
+
