@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSpinBox, 
-    QPushButton, QFrame, QMessageBox, QWidget, QGraphicsDropShadowEffect
+    QPushButton, QFrame, QMessageBox, QWidget, QGraphicsDropShadowEffect,
+    QLineEdit, QCompleter
 )
 from PyQt6.QtCore import Qt, QRectF, QSizeF
 from PyQt6.QtGui import QFont, QPainter, QPixmap, QColor, QPen, QFontMetrics
@@ -37,8 +38,15 @@ class EtiquetaPreviewWidget(QFrame):
     def set_producto(self, producto):
         self.producto = producto
         if producto:
-            # Si no hay código de barras, usamos un código único de 6 dígitos por defecto
-            codigo_a_generar = producto.get('codigo_barras') or f"1{producto.get('id', 0):05d}"
+            prod_id = producto.get('id')
+            if isinstance(prod_id, int):
+                fallback_code = f"200{prod_id:09d}"
+            elif prod_id:
+                fallback_code = str(prod_id)
+            else:
+                fallback_code = "000000"
+                
+            codigo_a_generar = producto.get('codigo_barras') or fallback_code
             self.pixmap_barcode = generar_barcode_pixmap(str(codigo_a_generar))
         else:
             self.pixmap_barcode = None
@@ -49,7 +57,7 @@ class EtiquetaPreviewWidget(QFrame):
         if not self.producto:
             painter = QPainter(self)
             painter.setPen(QColor("#7A7067"))
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Seleccione un producto")
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Seleccione o ingrese un producto")
             return
 
         painter = QPainter(self)
@@ -94,9 +102,18 @@ class EtiquetaPreviewWidget(QFrame):
             painter.drawPixmap(rect_barcode.toRect(), self.pixmap_barcode)
 
         # 3. Código de Barras en Texto (Abajo)
-        cod_barras = self.producto.get('codigo_barras') or f"1{self.producto.get('id', 0):05d}"
-        id_corto = str(self.producto.get('id', ''))
-        texto_abajo = f"{cod_barras} | ID: {id_corto}"
+        prod_id = self.producto.get('id')
+        if isinstance(prod_id, int):
+            cod_barras = self.producto.get('codigo_barras') or f"200{prod_id:09d}"
+            id_corto = str(prod_id)
+            texto_abajo = f"{cod_barras} | ID: {id_corto}"
+        elif prod_id:
+            cod_barras = self.producto.get('codigo_barras') or str(prod_id)
+            texto_abajo = f"{cod_barras} | ID: {prod_id}"
+        else:
+            cod_barras = self.producto.get('codigo_barras') or ""
+            texto_abajo = f"{cod_barras}" if cod_barras else "ETIQUETA MANUAL"
+
         font_codigo = QFont("Consolas", 10, QFont.Weight.Bold)
         painter.setFont(font_codigo)
         painter.setPen(QColor("#1C1613"))
@@ -109,7 +126,7 @@ class ImpresorEtiquetasDialog(QDialog):
     def __init__(self, producto_inicial_id=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Impresión de Etiquetas")
-        self.setFixedSize(460, 520)
+        self.setFixedSize(480, 580)
         self.producto_actual = None
         self.productos_list = []
         
@@ -135,6 +152,18 @@ class ImpresorEtiquetasDialog(QDialog):
             QComboBox:focus {
                 border: 1px solid #B09886;
             }
+            QLineEdit {
+                background-color: #FFFFFF;
+                color: #2C2520;
+                border: 1px solid #D1C7BD;
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-size: 13px;
+                min-height: 32px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #B09886;
+            }
             QSpinBox {
                 background-color: #FFFFFF;
                 color: #2C2520;
@@ -155,8 +184,8 @@ class ImpresorEtiquetasDialog(QDialog):
 
     def init_ui(self):
         layout_principal = QVBoxLayout()
-        layout_principal.setContentsMargins(24, 24, 24, 24)
-        layout_principal.setSpacing(16)
+        layout_principal.setContentsMargins(24, 20, 24, 20)
+        layout_principal.setSpacing(12)
         self.setLayout(layout_principal)
 
         # Título
@@ -172,19 +201,56 @@ class ImpresorEtiquetasDialog(QDialog):
         line.setStyleSheet("color: #E5DFD5; background-color: #E5DFD5;")
         layout_principal.addWidget(line)
 
-        # Selección de producto
+        # 1. Buscador / Selector interactivo de artículo
         layout_prod = QVBoxLayout()
-        lbl_prod = QLabel("Seleccionar Producto:")
+        layout_prod.setSpacing(4)
+        lbl_prod = QLabel("Buscar / Seleccionar Producto de la Base de Datos:")
         lbl_prod.setStyleSheet("font-weight: bold; color: #544941;")
+        
         self.cb_producto = QComboBox()
+        self.cb_producto.setEditable(True)
+        self.cb_producto.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        if self.cb_producto.lineEdit():
+            self.cb_producto.lineEdit().setPlaceholderText("Escriba para buscar por nombre, código o ID...")
+            
         self.cb_producto.currentIndexChanged.connect(self.on_producto_changed)
         layout_prod.addWidget(lbl_prod)
         layout_prod.addWidget(self.cb_producto)
         layout_principal.addLayout(layout_prod)
 
-        # Cantidad de etiquetas
+        # 2. Campo de edición manual del nombre a imprimir
+        layout_manual = QVBoxLayout()
+        layout_manual.setSpacing(4)
+        lbl_manual = QLabel("Nombre / Descripción en la Etiqueta (Editable manualmente):")
+        lbl_manual.setStyleSheet("font-weight: bold; color: #544941;")
+        
+        self.txt_nombre_imprimir = QLineEdit()
+        self.txt_nombre_imprimir.setPlaceholderText("Ingrese o modifique el nombre a imprimir...")
+        self.txt_nombre_imprimir.textChanged.connect(self.on_nombre_manual_changed)
+        layout_manual.addWidget(lbl_manual)
+        layout_manual.addWidget(self.txt_nombre_imprimir)
+        layout_principal.addLayout(layout_manual)
+
+        # 3. Badge con datos de identificación
+        self.lbl_info_prod = QLabel("ID: - | Cód. Barras: -")
+        self.lbl_info_prod.setStyleSheet("""
+            QLabel {
+                background-color: #F4EFEB;
+                color: #5D5046;
+                font-size: 11px;
+                font-weight: bold;
+                border-radius: 4px;
+                padding: 4px 8px;
+            }
+        """)
+        layout_principal.addWidget(self.lbl_info_prod)
+
+        # 4. Cantidad de etiquetas
         layout_cant = QHBoxLayout()
-        layout_cant.addWidget(QLabel("Cantidad a imprimir:"))
+        lbl_cant = QLabel("Cantidad a imprimir:")
+        lbl_cant.setStyleSheet("font-weight: bold; color: #544941;")
+        layout_cant.addWidget(lbl_cant)
+        
         self.spn_cantidad = QSpinBox()
         self.spn_cantidad.setRange(1, 1000)
         self.spn_cantidad.setValue(1)
@@ -193,7 +259,7 @@ class ImpresorEtiquetasDialog(QDialog):
         layout_cant.addStretch()
         layout_principal.addLayout(layout_cant)
 
-        # Vista Previa
+        # 5. Vista Previa
         lbl_preview_title = QLabel("VISTA PREVIA DE ETIQUETA (50x25mm)")
         lbl_preview_title.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
         lbl_preview_title.setStyleSheet("color: #ACA096; letter-spacing: 1px;")
@@ -208,7 +274,7 @@ class ImpresorEtiquetasDialog(QDialog):
 
         layout_principal.addStretch()
 
-        # Botonera
+        # 6. Botonera
         layout_botones = QHBoxLayout()
         layout_botones.setSpacing(12)
         
@@ -240,35 +306,81 @@ class ImpresorEtiquetasDialog(QDialog):
         layout_principal.addLayout(layout_botones)
 
     def cargar_productos(self, producto_inicial_id=None):
-        self.productos_list = DataCache.get_productos()
+        # Recargar productos frescos y ordenarlos alfabéticamente para facilitar la búsqueda
+        raw_prods = DataCache.get_productos(force_reload=True) or []
+        self.productos_list = sorted(raw_prods, key=lambda p: str(p.get('nombre', '')).lower())
+        
         self.cb_producto.blockSignals(True)
         self.cb_producto.clear()
 
-        selected_index = 0
+        selected_index = -1
         for idx, p in enumerate(self.productos_list):
-            nombre = p.get('nombre', 'Sin nombre')
-            self.cb_producto.addItem(nombre, p['id'])
-            if producto_inicial_id and p['id'] == producto_inicial_id:
+            nombre = str(p.get('nombre', 'Sin nombre')).strip()
+            prod_id = p.get('id', '')
+            cod_barras = p.get('codigo_barras') or ''
+            
+            # Formato enriquecido y claro para el usuario
+            texto_item = f"{nombre}  [ID: {prod_id}]"
+            if cod_barras and cod_barras != f"200{prod_id:09d}":
+                texto_item += f" ({cod_barras})"
+                
+            self.cb_producto.addItem(texto_item, p)
+            if producto_inicial_id and prod_id == producto_inicial_id:
                 selected_index = idx
+
+        # Configurar autocompletado en modo 'contiene' para buscar por cualquier palabra o ID
+        completer = QCompleter(self.cb_producto.model(), self.cb_producto)
+        completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
+        self.cb_producto.setCompleter(completer)
 
         self.cb_producto.blockSignals(False)
 
-        if self.productos_list:
+        if selected_index >= 0:
             self.cb_producto.setCurrentIndex(selected_index)
             self.on_producto_changed(selected_index)
+        elif self.productos_list:
+            self.cb_producto.setCurrentIndex(0)
+            self.on_producto_changed(0)
 
     def on_producto_changed(self, index):
-        if 0 <= index < len(self.productos_list):
-            self.producto_actual = self.productos_list[index]
+        producto = self.cb_producto.itemData(index)
+        if producto and isinstance(producto, dict):
+            # Clon defensivo para permitir cambios locales sin corromper el caché global
+            self.producto_actual = producto.copy()
+            nombre = self.producto_actual.get('nombre', '')
+            
+            self.txt_nombre_imprimir.blockSignals(True)
+            self.txt_nombre_imprimir.setText(nombre)
+            self.txt_nombre_imprimir.blockSignals(False)
+            
+            prod_id = self.producto_actual.get('id', '')
+            cod = self.producto_actual.get('codigo_barras') or (f"200{prod_id:09d}" if isinstance(prod_id, int) else '')
+            self.lbl_info_prod.setText(f"✓ Artículo seleccionado: ID #{prod_id} | Cód. Barras: {cod}")
             self.preview_widget.set_producto(self.producto_actual)
 
-    def imprimir_etiquetas(self):
+    def on_nombre_manual_changed(self, texto):
+        nombre_ingresado = texto.strip()
         if not self.producto_actual:
-            QMessageBox.warning(self, "Atención", "Debe seleccionar un producto para imprimir.")
+            self.producto_actual = {
+                'nombre': nombre_ingresado or 'Sin Nombre',
+                'id': '',
+                'codigo_barras': '',
+                'categoria_nombre': ''
+            }
+            self.lbl_info_prod.setText("✎ Modo texto manual (sin vincular a artículo)")
+        else:
+            self.producto_actual['nombre'] = nombre_ingresado or 'Sin Nombre'
+            
+        self.preview_widget.set_producto(self.producto_actual)
+
+    def imprimir_etiquetas(self):
+        if not self.producto_actual or not self.producto_actual.get('nombre'):
+            QMessageBox.warning(self, "Atención", "Debe seleccionar un producto o ingresar un nombre para imprimir.")
             return
 
         cantidad = self.spn_cantidad.value()
-        
         printer = QPrinter(QPrinter.PrinterMode.HighResolution)
         
         # Configurar tamaño de página exacto a 50mm x 25mm
@@ -306,25 +418,37 @@ class ImpresorEtiquetasDialog(QDialog):
         w = rect_page.width()
         h = rect_page.height()
 
-        codigo_barras = self.producto_actual.get('codigo_barras') or f"1{self.producto_actual.get('id', 0):05d}"
+        prod_id = self.producto_actual.get('id') if self.producto_actual else None
+        if isinstance(prod_id, int):
+            codigo_barras = self.producto_actual.get('codigo_barras') or f"200{prod_id:09d}"
+            id_corto_txt = str(prod_id)
+            texto_abajo = f"{codigo_barras} | ID: {id_corto_txt}"
+        elif prod_id:
+            codigo_barras = self.producto_actual.get('codigo_barras') or str(prod_id)
+            id_corto_txt = str(prod_id)
+            texto_abajo = f"{codigo_barras} | ID: {id_corto_txt}"
+        else:
+            codigo_barras = (self.producto_actual.get('codigo_barras') if self.producto_actual else None) or "000000"
+            texto_abajo = f"{codigo_barras}" if self.producto_actual and self.producto_actual.get('codigo_barras') else "ETIQUETA MANUAL"
+
         pixmap_bc = generar_barcode_pixmap(str(codigo_barras))
 
-        nombre_base = str(self.producto_actual.get('nombre', '')).strip()
-        categoria = self.producto_actual.get('categoria_nombre') or ''
-        if not categoria and self.producto_actual.get('categoria_id'):
+        # El nombre impreso se toma prioritariamente del campo editable
+        nombre_base = ""
+        if hasattr(self, 'txt_nombre_imprimir') and self.txt_nombre_imprimir.text().strip():
+            nombre_base = self.txt_nombre_imprimir.text().strip()
+        elif self.producto_actual:
+            nombre_base = str(self.producto_actual.get('nombre', '')).strip()
+
+        categoria = self.producto_actual.get('categoria_nombre') or '' if self.producto_actual else ''
+        if not categoria and self.producto_actual and self.producto_actual.get('categoria_id'):
             cats = DataCache.get_categorias()
             for c in cats:
                 if c.get('id') == self.producto_actual.get('categoria_id'):
                     categoria = c.get('nombre', '')
                     break
 
-        if categoria:
-            nombre = f"{nombre_base} - {categoria}".upper()
-        else:
-            nombre = nombre_base.upper()
-
-        id_corto_txt = str(self.producto_actual.get('id', ''))
-        codigo_text = str(codigo_barras)
+        categoria = categoria.strip().upper()
 
         for i in range(cantidad):
             if i > 0:
@@ -356,7 +480,6 @@ class ImpresorEtiquetasDialog(QDialog):
                 painter.drawPixmap(rect_bc.toRect(), pixmap_bc)
 
             # 3. Texto Inferior
-            texto_abajo = f"{codigo_text} | ID: {id_corto_txt}"
             font_cod = QFont("Consolas", 8, QFont.Weight.Bold)
             painter.setFont(font_cod)
             painter.setPen(QColor("#000000"))

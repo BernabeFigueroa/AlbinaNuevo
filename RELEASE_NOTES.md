@@ -1,6 +1,6 @@
-# Albina Accesorios v1.1.20
+# Albina Accesorios v1.1.21
 
-- Las ventas fiadas envían siempre el precio de contado, incluso cuando el servidor todavía utiliza una versión anterior de la función de ventas.
-- Se evita que los artículos provisorios de una venta fiada se registren con el recargo del 35% correspondiente a tarjeta.
-- Se incorpora una corrección segura e idempotente para la venta #799 de Daniela Slame: total y deuda pasan de $440.909 a $403.984.
-- La corrección histórica valida todos los importes esperados y se revierte completa si encuentra datos diferentes, sin modificar otras ventas.
+- Impresión de etiquetas: buscador interactivo con autocompletado en tiempo real (nombre, ID y código) y orden alfabético.
+- Soporte para ingresar o editar manualmente el texto/nombre en la etiqueta antes de imprimir.
+- Corrección de desincronización de IDs al imprimir etiquetas y vinculación estricta de datos (Data-Binding por objeto).
+- Mantenimiento de artículos: sincronización automática del formulario con el artículo buscado o seleccionado con un solo clic en la grilla sin requerir doble clic.

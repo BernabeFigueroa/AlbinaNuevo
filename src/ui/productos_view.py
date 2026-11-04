@@ -306,9 +306,9 @@ class ProductosView(QWidget):
         search_layout = QHBoxLayout()
         search_layout.addWidget(QLabel("Búsqueda:"))
         self.txt_buscar = QLineEdit()
-        self.txt_buscar
         self.txt_buscar.setPlaceholderText("Nombre, Código o ID...")
         self.txt_buscar.textChanged.connect(self.filtrar_grilla)
+        self.txt_buscar.returnPressed.connect(self._on_buscar_enter)
         search_layout.addWidget(self.txt_buscar)
         
         search_layout.addWidget(QLabel("Rubro:"))
@@ -344,6 +344,7 @@ class ProductosView(QWidget):
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.verticalHeader().setVisible(True)
         self.tabla.verticalHeader().setDefaultSectionSize(32)
+        self.tabla.cellClicked.connect(self.cargar_producto_para_edicion)
         self.tabla.cellDoubleClicked.connect(self.cargar_producto_para_edicion)
         grid_layout.addWidget(self.tabla)
 
@@ -481,11 +482,21 @@ class ProductosView(QWidget):
             print(f"Error cargando grilla de productos: {e}")
         finally:
             self.tabla.setUpdatesEnabled(True)
+            if filtro.strip():
+                if self.tabla.rowCount() == 1:
+                    self.cargar_producto_para_edicion(0, 0)
+                elif self.tabla.rowCount() == 0:
+                    self.limpiar_formulario()
 
     def filtrar_grilla(self, texto):
         self.cargar_grilla(texto)
 
-    def cargar_producto_para_edicion(self, row, col):
+    def _on_buscar_enter(self):
+        if self.tabla.rowCount() > 0:
+            self.cargar_producto_para_edicion(0, 0)
+
+    def cargar_producto_para_edicion(self, row, col=0):
+        self.tabla.selectRow(row)
         item_codigo = self.tabla.item(row, 0)
         if not item_codigo: return
         producto_id = item_codigo.data(Qt.ItemDataRole.UserRole)
@@ -608,7 +619,26 @@ class ProductosView(QWidget):
 
     def abrir_impresor_etiquetas(self):
         from src.ui.impresor_etiquetas_dialog import ImpresorEtiquetasDialog
-        dialog = ImpresorEtiquetasDialog(producto_inicial_id=self.producto_seleccionado_id, parent=self)
+        prod_id = None
+        
+        # 1. Si hay una fila seleccionada activamente en la grilla, priorizarla
+        row = self.tabla.currentRow()
+        if row >= 0:
+            item = self.tabla.item(row, 0)
+            if item:
+                prod_id = item.data(Qt.ItemDataRole.UserRole)
+                
+        # 2. Si no hay fila en la grilla pero hay un solo resultado filtrado (búsqueda unívoca)
+        if not prod_id and self.tabla.rowCount() == 1:
+            item = self.tabla.item(0, 0)
+            if item:
+                prod_id = item.data(Qt.ItemDataRole.UserRole)
+                
+        # 3. Si no, tomar el producto cargado actualmente en el formulario de edición
+        if not prod_id:
+            prod_id = self.producto_seleccionado_id
+            
+        dialog = ImpresorEtiquetasDialog(producto_inicial_id=prod_id, parent=self)
         dialog.exec()
 
     def duplicar_producto(self):
