@@ -116,7 +116,7 @@ class ProductosManager:
     def actualizar_producto(producto_id, codigo_barras, nombre, costo_lista, flete, utilidad_porcentaje, precio_contado, precio_tarjeta, stock_actual, stock_minimo, stock_maximo=100.0, categoria_id=None, proveedor_id=None, codigo_fabrica="", unidades_bulto=1, ubicacion="", observaciones="", talle=""):
         ProductosManager._check_permission()
         costo_final = float(costo_lista) + float(flete)
-        codigo_barras = codigo_barras.strip() if codigo_barras and codigo_barras.strip() else f"200{producto_id:09d}"
+        codigo_barras = codigo_barras.strip() if codigo_barras and codigo_barras.strip() else None
         
         user = AuthManager.get_current_user()
         usuario_id = user.id if user else None

@@ -216,7 +216,7 @@ class ReportesManager:
         
         supabase = get_supabase()
         res = supabase.table('ventas_detalle').select(
-            'cantidad, subtotal, productos(codigo_barras, nombre), ventas!inner(estado, fecha)'
+            'cantidad, subtotal, descripcion, productos(codigo_barras, nombre), ventas!inner(estado, fecha)'
         ).neq('ventas.estado', 'CANCELADA').neq('ventas.estado', 'ANULADA').gte('ventas.fecha', desde).lte('ventas.fecha', hasta).execute()
         
         agrupado = defaultdict(lambda: {'codigo_barras': '', 'nombre': '', 'cant_total': 0, 'recaudacion': 0.0})
@@ -224,7 +224,7 @@ class ReportesManager:
         for d in res.data:
             if not d.get('productos'):
                 continue
-            prod_nombre = d['productos']['nombre']
+            prod_nombre = d.get('descripcion') or d['productos']['nombre']
             prod_codigo = d['productos']['codigo_barras']
             
             agrupado[prod_nombre]['codigo_barras'] = prod_codigo

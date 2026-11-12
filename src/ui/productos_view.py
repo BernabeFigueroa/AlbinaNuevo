@@ -1,6 +1,9 @@
+from math import isfinite
+
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox,
-    QTableWidget, QTableWidgetItem, QPushButton, QHeaderView, QMessageBox, QFrame, QGridLayout, QSplitter, QCheckBox
+    QTableWidget, QTableWidgetItem, QPushButton, QHeaderView, QMessageBox, QFrame, QGridLayout, QSplitter, QCheckBox,
+    QDialog, QDialogButtonBox, QFormLayout
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QShortcut, QKeySequence
@@ -15,36 +18,136 @@ from src.core.categorias_manager import CategoriasManager
 from src.core.proveedores_manager import ProveedoresManager
 from src.core.configuracion_manager import ConfiguracionManager
 
+
+class NuevoArticuloDialog(QDialog):
+    def __init__(self, parent, datos=None):
+        super().__init__(parent)
+        self.setWindowTitle("Nuevo artículo")
+        self.setMinimumWidth(380)
+        datos = datos or {}
+        formulario = QFormLayout(self)
+        self.nombre = QLineEdit(datos.get("nombre", ""))
+        formulario.addRow("Nombre", self.nombre)
+        self.campos = {}
+        for clave, etiqueta in (
+            ("costo_lista", "Costo"),
+            ("utilidad_porcentaje", "Utilidad (%)"),
+            ("precio_contado", "Precio efectivo / transferencia"),
+            ("precio_tarjeta", "Precio tarjeta"),
+            ("stock_actual", "Stock actual"),
+        ):
+            campo = NumericLineEdit(str(datos.get(clave, 0)))
+            formulario.addRow(etiqueta, campo)
+            self.campos[clave] = campo
+
+        self.campos["costo_lista"].textEdited.connect(self.recalcular_precios)
+        self.campos["utilidad_porcentaje"].textEdited.connect(self.recalcular_precios)
+        self.campos["precio_contado"].textEdited.connect(self.recalcular_desde_contado)
+
+        botones = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
+        crear = botones.addButton("Crear artículo", QDialogButtonBox.ButtonRole.AcceptRole)
+        crear.setDefault(True)
+        botones.accepted.connect(self.guardar)
+        botones.rejected.connect(self.reject)
+        formulario.addRow(botones)
+        self.nombre.setFocus()
+
+    def numero(self, clave):
+        valor = float(self.campos[clave].text().strip().replace(",", "."))
+        if not isfinite(valor):
+            raise ValueError
+        return valor
+
+    def recalcular_precios(self):
+        try:
+            costo = self.numero("costo_lista")
+            utilidad = self.numero("utilidad_porcentaje")
+        except ValueError:
+            return
+        contado = round(costo * (1 + utilidad / 100), 2)
+        self.campos["precio_contado"].setText(f"{contado:.2f}")
+        self.calcular_tarjeta(contado)
+
+    def recalcular_desde_contado(self):
+        try:
+            costo = self.numero("costo_lista")
+            contado = self.numero("precio_contado")
+        except ValueError:
+            return
+        if costo > 0:
+            self.campos["utilidad_porcentaje"].setText(f"{((contado / costo) - 1) * 100:.2f}")
+        self.calcular_tarjeta(contado)
+
+    def calcular_tarjeta(self, contado):
+        recargo = ConfiguracionManager.get_recargo_tarjeta()
+        self.campos["precio_tarjeta"].setText(f"{contado * (1 + recargo / 100):.2f}")
+
+    def guardar(self):
+        nombre = self.nombre.text().strip()
+        if not nombre:
+            QMessageBox.warning(self, "Nuevo artículo", "Ingresa el nombre del artículo.")
+            return
+        try:
+            valores = {clave: self.numero(clave) for clave in self.campos}
+            if any(valor < 0 for clave, valor in valores.items() if clave != "utilidad_porcentaje"):
+                raise ValueError
+        except ValueError:
+            QMessageBox.warning(self, "Nuevo artículo", "Revisa el costo, la utilidad, los precios y el stock.")
+            return
+        try:
+            ProductosManager.crear_producto(
+                nombre=nombre, codigo_barras=None, flete=0, stock_minimo=5, **valores
+            )
+        except Exception as error:
+            QMessageBox.critical(self, "Error", f"No se pudo crear el artículo.\n{error}")
+            return
+        self.accept()
+
+
 class ProductosView(QWidget):
     def __init__(self):
         super().__init__()
         self.producto_seleccionado_id = None
+        self.identidad_original = None
+        self.cargando_catalogo = False
         self.init_ui()
-        self.cargar_datos_iniciales()
+        self.limpiar_formulario()
 
     def cargar_datos_iniciales(self):
         """Obtiene el catálogo fuera del hilo de interfaz al abrir la vista."""
         from src.core.cache_manager import DataCache
         from src.utils.async_worker import run_async
 
+        if self.cargando_catalogo:
+            return
+
+        incluir_inactivos = self.chk_inactivos.isChecked()
+
         def obtener_datos():
             return (
                 DataCache.get_categorias(),
                 DataCache.get_proveedores(),
-                DataCache.get_productos(),
+                DataCache.get_productos(incluir_inactivos=incluir_inactivos),
             )
 
-        self.tabla.setUpdatesEnabled(False)
+        self.cargando_catalogo = True
+        self.lbl_estado_catalogo.setText("Cargando catálogo…")
+        self.lbl_estado_catalogo.show()
         run_async(obtener_datos, on_result=self._mostrar_datos_iniciales,
-                  on_error=lambda error: self._terminar_carga_inicial(error))
+                  on_error=self._terminar_carga_inicial)
 
     def _mostrar_datos_iniciales(self, datos):
+        self.cargando_catalogo = False
         categorias, proveedores, productos = datos
         self.cargar_combos(categorias, proveedores)
-        self.cargar_grilla(productos=productos)
+        self.cargar_grilla(self.txt_buscar.text(), productos=productos)
+        self.lbl_estado_catalogo.hide()
 
     def _terminar_carga_inicial(self, error):
-        self.tabla.setUpdatesEnabled(True)
+        self.cargando_catalogo = False
+        self.lbl_estado_catalogo.setText(
+            "No se pudo cargar el catálogo. Vuelve a abrir Productos para reintentar."
+        )
         print(f"Error cargando productos: {error}")
 
     def crear_seccion_frame(self):
@@ -59,16 +162,12 @@ class ProductosView(QWidget):
         """)
         return frame
 
-    def cargar_combos(self, cats=None, provs=None):
-        from src.core.cache_manager import DataCache
+    def cargar_combos(self, cats, provs):
         # Guardar selecciones actuales
         cur_cat = self.cb_categoria.currentData() if hasattr(self, 'cb_categoria') else None
         cur_prov = self.cb_proveedor.currentData() if hasattr(self, 'cb_proveedor') else None
         cur_filtro_cat = self.cb_filtro_categoria.currentData() if hasattr(self, 'cb_filtro_categoria') else None
         cur_filtro_prov = self.cb_filtro_proveedor.currentData() if hasattr(self, 'cb_filtro_proveedor') else None
-
-        cats = DataCache.get_categorias() if cats is None else cats
-        provs = DataCache.get_proveedores() if provs is None else provs
 
         if hasattr(self, 'cb_categoria'):
             self.cb_categoria.blockSignals(True)
@@ -124,6 +223,12 @@ class ProductosView(QWidget):
         lbl_titulo.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
         lbl_titulo.setStyleSheet("color: #000000;")
         layout_principal.addWidget(lbl_titulo)
+        self.lbl_estado_catalogo = QLabel()
+        self.lbl_estado_catalogo.hide()
+        layout_principal.addWidget(self.lbl_estado_catalogo)
+        self.lbl_modo = QLabel("Nuevo artículo")
+        self.lbl_modo.setTextFormat(Qt.TextFormat.PlainText)
+        layout_principal.addWidget(self.lbl_modo)
 
         # --- PANEL SUPERIOR: FORMULARIO ---
         form_widget = QWidget()
@@ -133,6 +238,13 @@ class ProductosView(QWidget):
 
         # Un solo contenedor para el formulario
         g_frame = self.crear_seccion_frame()
+        self.marco_articulo = g_frame
+        self.marco_articulo.setObjectName("marcoArticulo")
+        self.estilo_marco_articulo = g_frame.styleSheet()
+        self.pulsos_edicion = 0
+        self.timer_edicion = QTimer(self)
+        self.timer_edicion.setInterval(400)
+        self.timer_edicion.timeout.connect(self.pulsar_marco_edicion)
         g_layout = QGridLayout(g_frame)
         g_layout.setContentsMargins(12, 8, 12, 8)
         g_layout.setVerticalSpacing(8)
@@ -243,10 +355,10 @@ class ProductosView(QWidget):
             }
         """
 
-        self.btn_limpiar = QPushButton("Limpiar/Nuevo")
+        self.btn_limpiar = QPushButton("Nuevo artículo")
         self.btn_limpiar.setObjectName("btn_neutral")
         self.btn_limpiar.setStyleSheet(btn_estilo_delicado)
-        self.btn_limpiar.clicked.connect(self.limpiar_formulario)
+        self.btn_limpiar.clicked.connect(lambda: self.abrir_alta())
         
         self.btn_eliminar = QPushButton("Eliminar")
         self.btn_eliminar.setObjectName("btn_danger")
@@ -276,10 +388,12 @@ class ProductosView(QWidget):
         self.btn_duplicar.setStyleSheet(btn_estilo_delicado)
         self.btn_duplicar.clicked.connect(self.duplicar_producto)
 
-        self.btn_grabar = QPushButton("Guardar (F5)")
+        self.btn_grabar = QPushButton("Guardar cambios (F5)")
         self.btn_grabar.setObjectName("btn_primary")
         self.btn_grabar.setStyleSheet(btn_estilo_delicado)
         self.btn_grabar.clicked.connect(self.grabar_producto)
+        self.btn_cancelar_edicion = QPushButton("Cerrar edición")
+        self.btn_cancelar_edicion.clicked.connect(self.limpiar_formulario)
         
         self.shortcut_f5 = QShortcut(QKeySequence("F5"), self)
         self.shortcut_f5.activated.connect(self.grabar_producto)
@@ -293,6 +407,7 @@ class ProductosView(QWidget):
         btn_layout.addStretch()
         btn_layout.addWidget(self.btn_duplicar)
         btn_layout.addWidget(self.btn_grabar)
+        btn_layout.addWidget(self.btn_cancelar_edicion)
 
         form_layout.addLayout(btn_layout)
         
@@ -344,8 +459,8 @@ class ProductosView(QWidget):
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.verticalHeader().setVisible(True)
         self.tabla.verticalHeader().setDefaultSectionSize(32)
-        self.tabla.cellClicked.connect(self.cargar_producto_para_edicion)
         self.tabla.cellDoubleClicked.connect(self.cargar_producto_para_edicion)
+        self.tabla.setToolTip("Haz doble clic en un artículo para editarlo.")
         grid_layout.addWidget(self.tabla)
 
         layout_principal.addWidget(grid_widget, 1)
@@ -482,11 +597,6 @@ class ProductosView(QWidget):
             print(f"Error cargando grilla de productos: {e}")
         finally:
             self.tabla.setUpdatesEnabled(True)
-            if filtro.strip():
-                if self.tabla.rowCount() == 1:
-                    self.cargar_producto_para_edicion(0, 0)
-                elif self.tabla.rowCount() == 0:
-                    self.limpiar_formulario()
 
     def filtrar_grilla(self, texto):
         self.cargar_grilla(texto)
@@ -504,9 +614,18 @@ class ProductosView(QWidget):
         if not producto:
             return
             
+        self.marco_articulo.show()
+        self.btn_cancelar_edicion.show()
         self.producto_seleccionado_id = producto['id']
+        self.lbl_modo.setText(f"Editando #{producto['id']} · {producto['nombre']}")
+        self.lbl_modo.setStyleSheet("color: #B42318; font-weight: bold;")
+        self.pulsos_edicion = 7
+        self.pulsar_marco_edicion()
+        self.timer_edicion.start()
+        self.btn_grabar.setText("Guardar cambios (F5)")
         self.txt_codigo_interno.setText(str(producto['id']))
-        self.txt_codigo_barras.setText(producto.get('codigo_barras') or f"1{producto['id']:05d}")
+        self.txt_codigo_barras.setText(producto.get('codigo_barras') or "")
+        self.identidad_original = (producto['nombre'], self.txt_codigo_barras.text())
         self.txt_codigo_fabrica.setText(producto.get('codigo_fabrica') or "")
         self.txt_descripcion.setText(producto['nombre'])
         
@@ -559,10 +678,37 @@ class ProductosView(QWidget):
             self.btn_eliminar.setVisible(True)
             self.btn_restaurar.setVisible(False)
             self.btn_grabar.setEnabled(True)
-            self.btn_grabar.setText("Actualizar")
+
+    def pulsar_marco_edicion(self):
+        color = "#B42318" if self.pulsos_edicion % 2 else "#FCA5A5"
+        self.marco_articulo.setStyleSheet(
+            self.estilo_marco_articulo
+            + f"QFrame#marcoArticulo {{ border: 3px solid {color}; }}"
+        )
+        self.pulsos_edicion -= 1
+        if self.pulsos_edicion == 0:
+            self.timer_edicion.stop()
+
+    def cerrar_edicion(self):
+        self.timer_edicion.stop()
+        self.marco_articulo.setStyleSheet(self.estilo_marco_articulo)
+        self.lbl_modo.setStyleSheet("")
+        self.producto_seleccionado_id = None
+        self.identidad_original = None
+        self.lbl_modo.setText("Haz doble clic en un artículo para editarlo.")
+        self.marco_articulo.hide()
+        self.btn_cancelar_edicion.hide()
+        self.txt_codigo_interno.setText("[ Automático ]")
+        self.btn_grabar.setEnabled(False)
+        self.btn_eliminar.setEnabled(False)
+        self.btn_eliminar.setVisible(True)
+        self.btn_restaurar.setVisible(False)
+        self.btn_ficha.setEnabled(False)
 
     def limpiar_formulario(self):
-        self.txt_codigo_interno.setText("[ Automático ]")
+        self.cerrar_edicion()
+        self.cb_categoria.setCurrentIndex(0)
+        self.cb_proveedor.setCurrentIndex(0)
         self.txt_codigo_barras.clear()
         self.txt_codigo_fabrica.clear()
         self.txt_descripcion.clear()
@@ -578,14 +724,6 @@ class ProductosView(QWidget):
         self.txt_talle.clear()
         self.lbl_creado_por.setText("-")
         self.lbl_modificado_por.setText("-")
-        self.producto_seleccionado_id = None
-        self.btn_eliminar.setEnabled(False)
-        self.btn_eliminar.setVisible(True)
-        self.btn_restaurar.setVisible(False)
-        self.btn_ficha.setEnabled(False)
-        self.btn_grabar.setEnabled(True)
-        self.btn_grabar.setText("Guardar (F5)")
-        self.txt_codigo_barras.setFocus()
 
     def eliminar_producto(self):
         if not self.producto_seleccionado_id:
@@ -641,40 +779,63 @@ class ProductosView(QWidget):
         dialog = ImpresorEtiquetasDialog(producto_inicial_id=prod_id, parent=self)
         dialog.exec()
 
-    def duplicar_producto(self):
-        row = self.tabla.currentRow()
-        if row < 0:
-            QMessageBox.warning(self, "Advertencia", "Seleccione un producto de la grilla para duplicar.")
+    def abrir_alta(self, datos=None):
+        dialogo = NuevoArticuloDialog(self, datos)
+        if dialogo.exec() != QDialog.DialogCode.Accepted:
             return
+        self.limpiar_formulario()
+        self.cargar_grilla(self.txt_buscar.text())
 
-        codigo_mostrar = self.tabla.item(row, 0).text()
-        codigo = codigo_mostrar.replace('[', '').replace(']', '')
-        prod = ProductosManager.get_by_codigo(codigo)
-        
-        if prod:
-            self.producto_seleccionado_id = None
-            self.txt_codigo_interno.setText("[ Automático ]")
-            self.txt_codigo_barras.clear()
-            self.txt_codigo_fabrica.clear()
-            
-            self.txt_descripcion.setText("Copia de " + prod['nombre'])
-            self.txt_costo_lista.setText(str(prod['costo_lista']))
-            self.txt_flete.setText(str(prod['flete']))
-            self.txt_utilidad.setText(str(prod['utilidad_porcentaje']))
-            self.txt_precio_contado.setText(str(prod['precio_contado']))
-            self.txt_precio_tarjeta.setText(str(prod['precio_tarjeta']))
-            
-            self.txt_stock_actual.setText(str(prod['stock_actual']))
-            self.txt_stock_min.setText(str(prod['stock_minimo']))
-            self.txt_talle.setText(prod.get('talle') or "")
-            
-            self.btn_grabar.setText("Guardar (F5)")
-            self.btn_eliminar.setEnabled(False)
-            self.btn_ficha.setEnabled(False)
-            self.txt_codigo_barras.setFocus()
-            QMessageBox.information(self, "Duplicar", "Producto copiado al formulario. Escanee el nuevo código de barras y presione Guardar.")
+    def duplicar_producto(self):
+        item = self.tabla.item(self.tabla.currentRow(), 0)
+        if item is None:
+            QMessageBox.warning(self, "Duplicar", "Selecciona un artículo de la lista.")
+            return
+        try:
+            producto = ProductosManager.get_by_id(item.data(Qt.ItemDataRole.UserRole))
+        except Exception as error:
+            QMessageBox.critical(self, "Duplicar", f"No se pudo leer el artículo.\n{error}")
+            return
+        if producto:
+            self.abrir_alta({**producto, "nombre": f"Copia de {producto['nombre']}", "stock_actual": 0})
+
+    def confirmar_cambio_identidad(self):
+        nombre_original, codigo_original = self.identidad_original
+        nombre = self.txt_descripcion.text().strip()
+        codigo = self.txt_codigo_barras.text().strip()
+        if (nombre, codigo) == (nombre_original.strip(), codigo_original.strip()):
+            return True
+
+        dialogo = QMessageBox(self)
+        dialogo.setIcon(QMessageBox.Icon.Warning)
+        dialogo.setWindowTitle("Confirmar cambio de artículo")
+        dialogo.setTextFormat(Qt.TextFormat.PlainText)
+        dialogo.setText(
+            f"Vas a cambiar la identificación del artículo #{self.producto_seleccionado_id}.\n\n"
+            f"Nombre: {nombre_original} → {nombre}\n"
+            f"Código de barras: {codigo_original or '[Sin código]'} → {codigo or '[Sin código]'}"
+        )
+        crear = dialogo.addButton("Preparar artículo nuevo", QMessageBox.ButtonRole.ActionRole)
+        actualizar = dialogo.addButton(
+            f"Actualizar #{self.producto_seleccionado_id}", QMessageBox.ButtonRole.AcceptRole
+        )
+        cancelar = dialogo.addButton(QMessageBox.StandardButton.Cancel)
+        dialogo.setDefaultButton(cancelar)
+        dialogo.setEscapeButton(cancelar)
+        dialogo.exec()
+        if dialogo.clickedButton() == crear:
+            self.abrir_alta({
+                "nombre": nombre,
+                "costo_lista": self.txt_costo_lista.text(),
+                "utilidad_porcentaje": self.txt_utilidad.text(),
+                "precio_contado": self.txt_precio_contado.text(),
+                "precio_tarjeta": self.txt_precio_tarjeta.text(),
+            })
+        return dialogo.clickedButton() == actualizar
 
     def grabar_producto(self):
+        if self.producto_seleccionado_id is None or not self.btn_grabar.isEnabled():
+            return
         try:
             if not self.txt_descripcion.text().strip():
                 QMessageBox.warning(self, "Error", "La descripción es obligatoria.")
@@ -685,48 +846,28 @@ class ProductosView(QWidget):
             categoria_id = int(cat_data) if cat_data else None
             proveedor_id = int(prov_data) if prov_data else None
 
-            if self.producto_seleccionado_id:
-                # Actualizar
-                ProductosManager.actualizar_producto(
-                    producto_id=self.producto_seleccionado_id,
-                    codigo_barras=self.txt_codigo_barras.text(),
-                    codigo_fabrica=self.txt_codigo_fabrica.text(),
-                    nombre=self.txt_descripcion.text(),
-                    costo_lista=float(self.txt_costo_lista.text()),
-                    flete=float(self.txt_flete.text()),
-                    utilidad_porcentaje=float(self.txt_utilidad.text()),
-                    precio_contado=float(self.txt_precio_contado.text()),
-                    precio_tarjeta=float(self.txt_precio_tarjeta.text()),
-                    stock_actual=float(self.txt_stock_actual.text()),
-                    stock_minimo=float(self.txt_stock_min.text()),
-                    stock_maximo=float(self.txt_stock_max.text()),
-                    ubicacion=self.txt_ubicacion.text(),
-                    categoria_id=categoria_id,
-                    proveedor_id=proveedor_id,
-                    talle=self.txt_talle.text()
-                )
-                QMessageBox.information(self, "Éxito", "Artículo actualizado correctamente.")
-            else:
-                # Crear Nuevo
-                ProductosManager.crear_producto(
-                    codigo_barras=self.txt_codigo_barras.text(),
-                    codigo_fabrica=self.txt_codigo_fabrica.text(),
-                    nombre=self.txt_descripcion.text(),
-                    costo_lista=float(self.txt_costo_lista.text()),
-                    flete=float(self.txt_flete.text()),
-                    utilidad_porcentaje=float(self.txt_utilidad.text()),
-                    precio_contado=float(self.txt_precio_contado.text()),
-                    precio_tarjeta=float(self.txt_precio_tarjeta.text()),
-                    stock_actual=float(self.txt_stock_actual.text()),
-                    stock_minimo=float(self.txt_stock_min.text()),
-                    stock_maximo=float(self.txt_stock_max.text()),
-                    ubicacion=self.txt_ubicacion.text(),
-                    categoria_id=categoria_id,
-                    proveedor_id=proveedor_id,
-                    talle=self.txt_talle.text()
-                )
-                QMessageBox.information(self, "Éxito", "Artículo guardado correctamente.")
-                
+            if not self.confirmar_cambio_identidad():
+                return
+            ProductosManager.actualizar_producto(
+                producto_id=self.producto_seleccionado_id,
+                codigo_barras=self.txt_codigo_barras.text(),
+                codigo_fabrica=self.txt_codigo_fabrica.text(),
+                nombre=self.txt_descripcion.text(),
+                costo_lista=float(self.txt_costo_lista.text()),
+                flete=float(self.txt_flete.text()),
+                utilidad_porcentaje=float(self.txt_utilidad.text()),
+                precio_contado=float(self.txt_precio_contado.text()),
+                precio_tarjeta=float(self.txt_precio_tarjeta.text()),
+                stock_actual=float(self.txt_stock_actual.text()),
+                stock_minimo=float(self.txt_stock_min.text()),
+                stock_maximo=float(self.txt_stock_max.text()),
+                ubicacion=self.txt_ubicacion.text(),
+                categoria_id=categoria_id,
+                proveedor_id=proveedor_id,
+                talle=self.txt_talle.text()
+            )
+            QMessageBox.information(self, "Éxito", "Artículo actualizado correctamente.")
+
             self.limpiar_formulario()
             self.cargar_grilla()
         except Exception as e:
@@ -734,7 +875,7 @@ class ProductosView(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        self.cargar_combos()
+        self.cargar_datos_iniciales()
 
     def ver_ficha_producto(self):
         if not self.producto_seleccionado_id:

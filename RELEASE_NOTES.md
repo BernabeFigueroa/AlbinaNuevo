@@ -1,6 +1,8 @@
-# Albina Accesorios v1.1.21
+# Albina Accesorios v1.2.0
 
-- Impresión de etiquetas: buscador interactivo con autocompletado en tiempo real (nombre, ID y código) y orden alfabético.
-- Soporte para ingresar o editar manualmente el texto/nombre en la etiqueta antes de imprimir.
-- Corrección de desincronización de IDs al imprimir etiquetas y vinculación estricta de datos (Data-Binding por objeto).
-- Mantenimiento de artículos: sincronización automática del formulario con el artículo buscado o seleccionado con un solo clic en la grilla sin requerir doble clic.
+- **Alta de artículos.** Nuevo modal con nombre, costo, utilidad, precios de efectivo y tarjeta, y stock inicial. El sistema asigna el código de barras automáticamente.
+- **Edición de artículos.** Abrí una ficha con doble clic. El formulario muestra el nombre original y el ID, resalta la edición con un borde rojo y pide confirmación si cambia el nombre o el código de barras.
+- **Carga del catálogo.** Productos carga en segundo plano y permite reintentar si falla la conexión.
+- **Historial y comprobantes.** Una migración de Supabase registra los cambios de los artículos y conserva el nombre del producto en las ventas nuevas.
+
+Para habilitar el historial y la conservación del nombre en Supabase, aplicá la migración `migrations/20261112_historial_productos.sql`. Las ventas anteriores mantienen su comportamiento.
